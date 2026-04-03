@@ -3,7 +3,17 @@ import { useNavigate, Link } from 'react-router-dom';
 import client from '../api/client';
 import type { Periodo, Nivel, Centro, Carrera } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { AlertCircle, BookOpen, Calendar, Users, ChevronRight, GraduationCap } from 'lucide-react';
+import {
+  AlertCircle,
+  BookOpen,
+  Calendar,
+  Users,
+  ChevronRight,
+  GraduationCap,
+  Clock,
+  CheckCircle2,
+  Lightbulb,
+} from 'lucide-react';
 
 interface ActiveResponse {
   periodo: Periodo;
@@ -56,19 +66,16 @@ export const Home: React.FC = () => {
     );
   }
 
-  // Filter out "Todos los centros" from the main list
   const centros = data.centros.filter(
     (c) => c.nombre.toLowerCase() !== 'todos los centros'
   );
 
-  // Get niveles available for the selected centro
   const nivelesDisponibles = selectedCentro
     ? data.niveles.filter((n) =>
         data.centroNiveles[selectedCentro]?.includes(n.id)
       )
     : [];
 
-  // Auto-select nivel if only one is available
   const autoSelectedNivel =
     nivelesDisponibles.length === 1 ? nivelesDisponibles[0].id : selectedNivel;
 
@@ -77,7 +84,7 @@ export const Home: React.FC = () => {
 
   return (
     <div className="-mt-8 -mx-4">
-      {/* Hero Section */}
+      {/* Hero */}
       <div className="bg-gradient-header text-white py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex justify-center mb-4">
@@ -90,7 +97,6 @@ export const Home: React.FC = () => {
           </h1>
           <p className="text-blue-100 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Tu camino para enseñar, transformar y aprender desde la diversidad.
-            Consulta tus horarios actualizados según tu nivel y centro de apoyo.
           </p>
           <p className="text-blue-200/70 text-sm mt-4 italic">
             {data.periodo.label}
@@ -103,7 +109,10 @@ export const Home: React.FC = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 space-y-6">
           <div className="flex items-center gap-3 mb-2">
             <Calendar size={22} className="text-blue-600" />
-            <h2 className="text-lg font-bold text-gray-900">Consulta tu horario</h2>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Consulta tus horarios de clase</h2>
+              <p className="text-sm text-gray-500">Revisa tus horarios actualizados según tu nivel y centro de apoyo.</p>
+            </div>
           </div>
 
           {/* Centro Selection */}
@@ -152,21 +161,18 @@ export const Home: React.FC = () => {
             </div>
           )}
 
-          {/* Auto-selected nivel info */}
           {selectedCentro && nivelesDisponibles.length === 1 && (
             <div className="text-sm text-gray-600">
               Nivel disponible: <span className="font-semibold text-gray-900">{nivelesDisponibles[0].numero === 9 ? 'Plan Contingencia' : `${nivelesDisponibles[0].numero}° Nivel`}</span>
             </div>
           )}
 
-          {/* No niveles for this centro */}
           {selectedCentro && nivelesDisponibles.length === 0 && (
             <p className="text-sm text-gray-500">
               No hay niveles con horario para este centro.
             </p>
           )}
 
-          {/* View Button */}
           {canView && (
             <button
               onClick={() => {
@@ -183,8 +189,8 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Info Section */}
-      <div className="max-w-4xl mx-auto px-4 mt-10 mb-12">
+      {/* Quick Actions */}
+      <div className="max-w-4xl mx-auto px-4 mt-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
@@ -214,23 +220,65 @@ export const Home: React.FC = () => {
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Motivational quote */}
-        <div className="mt-8 text-center">
-          <p className="text-gray-400 text-sm italic">
-            "Yachayka kawsaymi" — El aprendizaje es vida.
+      {/* Tips Section — visually distinct, scannable */}
+      <div className="max-w-4xl mx-auto px-4 mt-10">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Lightbulb size={18} className="text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-base">La clave del éxito en modalidad virtual: organización</h3>
+              <p className="text-sm text-gray-600">La educación en línea te brinda flexibilidad, pero también requiere disciplina y constancia.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Organiza tu semana desde el inicio del bimestre</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <Clock size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Define horarios fijos de estudio cada día</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Revisa constantemente el AVAC</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Cumple con fechas de actividades y evaluaciones</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <Users size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Participa en tutorías y espacios de apoyo</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <Calendar size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-700">Suscríbete al calendario para no perderte nada</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-500 mt-4 italic text-center">
+            No se trata de tener más tiempo, sino de saber usarlo mejor.
           </p>
         </div>
+      </div>
 
-        {/* Docente link */}
-        <div className="mt-6 text-center">
-          <Link
-            to="/login"
-            className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-          >
-            ¿Eres docente? Accede a tu horario →
-          </Link>
-        </div>
+      {/* Kichwa quote + Docente link */}
+      <div className="max-w-4xl mx-auto px-4 mt-8 mb-12 text-center space-y-4">
+        <p className="text-gray-400 text-sm italic">
+          "Alli yachakuy, alli kawsay" — Buen aprendizaje, buena vida.
+        </p>
+        <Link
+          to="/login"
+          className="inline-block text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+        >
+          ¿Eres docente? Accede a tu horario →
+        </Link>
       </div>
     </div>
   );

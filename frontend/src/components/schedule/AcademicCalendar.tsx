@@ -13,17 +13,26 @@ const getBimestreLabel = (bimestre: number | null): string => {
 };
 
 const getTypeColor = (tipo: string): { bg: string; text: string; borderColor: string } => {
-  const tipo_lower = tipo.toLowerCase();
-  if (tipo_lower.includes('feriado') || tipo_lower.includes('vacaciones'))
+  const t = tipo.toLowerCase();
+  if (t.includes('feriado') || t.includes('vacaciones'))
     return { bg: '#fed7d7', text: '#9b2c2c', borderColor: '#c53030' };
-  if (tipo_lower.includes('examen'))
+  if (t.includes('examen') || t.includes('recuperacion') || t.includes('recuperación'))
     return { bg: '#e9d8fd', text: '#553399', borderColor: '#805ad5' };
-  if (tipo_lower.includes('evaluacion') || tipo_lower.includes('evaluación'))
-    return { bg: '#feebc8', text: '#7c2d12', borderColor: '#ed8936' };
-  if (tipo_lower.includes('entrega'))
+  if (t.includes('entrega'))
     return { bg: '#bee3f8', text: '#2a4365', borderColor: '#3182ce' };
-  if (tipo_lower.includes('recuperacion') || tipo_lower.includes('recuperación'))
+  if (t.includes('inicio'))
     return { bg: '#c6f6d5', text: '#22543d', borderColor: '#38a169' };
+  if (t.includes('paso_notas') || t.includes('notas'))
+    return { bg: '#feebc8', text: '#7c2d12', borderColor: '#ed8936' };
+  if (t.includes('induccion') || t.includes('inducción'))
+    return { bg: '#fefcbf', text: '#744210', borderColor: '#d69e2e' };
+  // Extracurricular events
+  if (t.includes('eucaristia') || t.includes('eucaristía'))
+    return { bg: '#f0e6ff', text: '#5b21b6', borderColor: '#7c3aed' };
+  if (t.includes('eleccion') || t.includes('elección') || t.includes('reunion') || t.includes('reunión'))
+    return { bg: '#dbeafe', text: '#1e40af', borderColor: '#3b82f6' };
+  if (t.includes('cultural') || t.includes('taller'))
+    return { bg: '#fce7f3', text: '#9d174d', borderColor: '#ec4899' };
   return { bg: '#e2e8f0', text: '#2d3748', borderColor: '#718096' };
 };
 

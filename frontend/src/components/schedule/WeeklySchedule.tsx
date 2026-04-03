@@ -162,6 +162,39 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     });
 
     // 3. Calendar events → timeline events
+    const eventoBadgeLabel = (tipo: string): string => {
+      const map: Record<string, string> = {
+        inicio_bimestre: 'INICIO BIMESTRE',
+        entrega: 'ENTREGA',
+        examen: 'EXAMEN',
+        recuperacion: 'RECUPERACIÓN',
+        paso_notas: 'PASO DE NOTAS',
+        inicio_ingles: 'INICIO INGLÉS',
+        induccion: 'INDUCCIÓN',
+        feriado: 'FERIADO',
+        eucaristia: 'EUCARISTÍA',
+        eleccion: 'ELECCIÓN',
+        evento_cultural: 'EVENTO CULTURAL',
+        reunion: 'REUNIÓN',
+        taller: 'TALLER',
+        otro: 'EVENTO',
+      };
+      return map[tipo.toLowerCase()] || tipo.toUpperCase();
+    };
+
+    const eventoBadgeColor = (tipo: string): { bg: string; text: string } => {
+      const t = tipo.toLowerCase();
+      if (t.includes('entrega')) return { bg: '#bee3f8', text: '#2a4365' };
+      if (t.includes('inicio')) return { bg: '#c6f6d5', text: '#22543d' };
+      if (t.includes('examen') || t.includes('recuperacion')) return { bg: '#e9d8fd', text: '#553399' };
+      if (t.includes('paso_notas')) return { bg: '#feebc8', text: '#7c2d12' };
+      if (t.includes('induccion')) return { bg: '#fefcbf', text: '#744210' };
+      if (t.includes('feriado')) return { bg: '#fed7d7', text: '#9b2c2c' };
+      if (t.includes('eucaristia') || t.includes('cultural') || t.includes('taller')) return { bg: '#fce7f3', text: '#9d174d' };
+      if (t.includes('eleccion') || t.includes('reunion')) return { bg: '#dbeafe', text: '#1e40af' };
+      return { bg: '#e6e6fa', text: '#2d2d4d' };
+    };
+
     eventos.forEach((evento) => {
       const fecha = parseUTCDate(evento.fecha);
       allEvents.push({
@@ -169,19 +202,13 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         fecha,
         fechaStr: evento.fecha,
         hora: '',
-        titulo: evento.nota || evento.tipo,
+        titulo: evento.nota || eventoBadgeLabel(evento.tipo),
         subtitulo: evento.fechaFin && evento.fechaFin !== evento.fecha
           ? `Hasta ${formatDateShort(parseUTCDate(evento.fechaFin))}`
           : undefined,
         tipo: 'evento',
-        badge: evento.tipo.toUpperCase(),
-        badgeColor: evento.tipo.toLowerCase().includes('entrega')
-          ? { bg: '#bee3f8', text: '#2a4365' }
-          : evento.tipo.toLowerCase().includes('inicio')
-            ? { bg: '#c6f6d5', text: '#22543d' }
-            : evento.tipo.toLowerCase().includes('fin')
-              ? { bg: '#fbd38d', text: '#744210' }
-              : { bg: '#e6e6fa', text: '#2d2d4d' },
+        badge: eventoBadgeLabel(evento.tipo),
+        badgeColor: eventoBadgeColor(evento.tipo),
         isPast: fecha < today,
       });
     });
