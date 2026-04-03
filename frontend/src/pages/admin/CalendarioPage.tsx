@@ -27,6 +27,11 @@ export const CalendarioPage: React.FC = () => {
     },
     { key: 'nota', label: 'Descripción' },
     { key: 'bimestre', label: 'Bimestre' },
+    {
+      key: 'enlace' as any,
+      label: 'Enlace',
+      render: (value: any) => value ? '🔗' : '-',
+    },
   ];
 
   const formFields: FormField[] = [
@@ -86,6 +91,13 @@ export const CalendarioPage: React.FC = () => {
       type: 'textarea',
       placeholder: 'Información adicional sobre el evento',
       value: editingItem?.nota || '',
+    },
+    {
+      name: 'enlace',
+      label: 'Enlace (Zoom, Meet, sitio web)',
+      type: 'text',
+      placeholder: 'https://zoom.us/j/123456 o cualquier URL',
+      value: (editingItem as any)?.enlace || '',
     },
   ];
 

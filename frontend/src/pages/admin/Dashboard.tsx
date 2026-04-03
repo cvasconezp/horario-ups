@@ -111,6 +111,7 @@ export const AdminDashboard: React.FC = () => {
   const [editDia, setEditDia] = useState('');
   const [editHora, setEditHora] = useState('');
   const [editFecha, setEditFecha] = useState(''); // for single session date override
+  const [editEnlace, setEditEnlace] = useState('');
   const [editStep, setEditStep] = useState<'form' | 'choose'>('form');
   const [upcomingSesiones, setUpcomingSesiones] = useState<UpcomingSesion[]>([]);
   const [selectedSesionId, setSelectedSesionId] = useState<number | null>(null);
@@ -216,6 +217,7 @@ export const AdminDashboard: React.FC = () => {
     setEditDia(asig.materia.dia || '');
     setEditHora(asig.materia.hora || '');
     setEditFecha('');
+    setEditEnlace(asig.enlaceVirtual || '');
     setEditStep('form');
     setSaveMsg('');
     setSelectedSesionId(null);
@@ -253,6 +255,13 @@ export const AdminDashboard: React.FC = () => {
         hora: editHora || null,
       });
 
+      // Save enlace on the asignacion if changed
+      if (editEnlace !== (editingAsig.enlaceVirtual || '')) {
+        await client.patch(`/admin/asignaciones/${editingAsig.id}`, {
+          enlaceVirtual: editEnlace || null,
+        });
+      }
+
       // Track this change for undo/highlight
       setRecentChanges((prev) => [
         { materiaId: editingAsig.materia.id, prevDia, prevHora, timestamp: Date.now() },
@@ -263,7 +272,8 @@ export const AdminDashboard: React.FC = () => {
       setAsignaciones((prev) =>
         prev.map((a) =>
           a.materia.id === editingAsig.materia.id
-            ? { ...a, materia: { ...a.materia, dia: editDia || null, hora: editHora || null } }
+            ? { ...a, materia: { ...a.materia, dia: editDia || null, hora: editHora || null },
+                ...(a.id === editingAsig.id ? { enlaceVirtual: editEnlace || null } : {}) }
             : a
         )
       );
@@ -561,6 +571,13 @@ export const AdminDashboard: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
                   <input type="time" value={editHora} onChange={(e) => setEditHora(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Enlace (Zoom, Meet, etc.)</label>
+                  <input type="url" value={editEnlace} onChange={(e) => setEditEnlace(e.target.value)}
+                    placeholder="https://zoom.us/j/123456"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
 

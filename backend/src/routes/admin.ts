@@ -1167,6 +1167,7 @@ admin_routes.post("/calendario", async (c) => {
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         bimestre: body.bimestre || null,
         nota: body.nota || null,
+        enlace: body.enlace || null,
       },
     });
     return c.json(evento, 201);
@@ -1187,6 +1188,7 @@ admin_routes.put("/calendario/:id", async (c) => {
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         bimestre: body.bimestre,
         nota: body.nota,
+        enlace: body.enlace || null,
       },
     });
     return c.json(evento);
