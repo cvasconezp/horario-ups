@@ -86,10 +86,12 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
   const timelineEvents = useMemo(() => {
     const allEvents: TimelineEvent[] = [];
 
-    // Build enlaceVirtual lookup from materias prop (which has asignacion data)
+    // Build lookups from materias prop (which has asignacion data)
     const enlaceMap = new Map<number, string>();
+    const docenteMap = new Map<number, string>();
     materias.forEach((m) => {
       if (m.enlaceVirtual) enlaceMap.set(m.id, m.enlaceVirtual);
+      if (m.docente?.nombre) docenteMap.set(m.id, m.docente.nombre);
     });
 
     // Filter out 2do bimestre materias
@@ -118,7 +120,10 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         hora: sesion.hora,
         horaFin,
         titulo: materia?.nombre || 'Sesión en línea',
-        subtitulo: materia ? `${sesion.tipo} U.${sesion.unidad}` : undefined,
+        subtitulo: [
+          materia ? `${sesion.tipo} U.${sesion.unidad}` : undefined,
+          materia ? docenteMap.get(materia.id) : undefined,
+        ].filter(Boolean).join(' · ') || undefined,
         tipo: 'online',
         badge: sesion.tipo?.toUpperCase() === 'TUTORÍA' ? 'TUTORÍA EN LÍNEA' : 'CLASE EN LÍNEA',
         badgeColor: sesion.tipo?.toUpperCase() === 'TUTORÍA'

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import type { HorarioResponse, SesionOnline, SesionPresencial, CalendarioEvento } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -7,7 +7,7 @@ import { WeeklySchedule } from '../components/schedule/WeeklySchedule';
 import { OnlineSessions } from '../components/schedule/OnlineSessions';
 import { PresencialSessions } from '../components/schedule/PresencialSessions';
 import { AcademicCalendar } from '../components/schedule/AcademicCalendar';
-import { AlertCircle, Calendar } from 'lucide-react';
+import { AlertCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { NotificationBanner } from '../components/NotificationBanner';
 
 export const ScheduleView: React.FC = () => {
@@ -23,6 +23,8 @@ export const ScheduleView: React.FC = () => {
     SesionPresencial[]
   >([]);
   const [eventos, setEventos] = useState<CalendarioEvento[]>([]);
+
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<
     'semanal' | 'online' | 'presenciales' | 'calendario'
@@ -113,6 +115,13 @@ export const ScheduleView: React.FC = () => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <div className="mb-4">
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 px-4 py-2 mb-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors text-sm"
+          >
+            <ArrowLeft size={18} />
+            Cambiar centro o nivel
+          </button>
           <h1 className="text-2xl font-bold text-gray-900">
             {horario.nivel.nombre} — {horario.centro.nombre}
           </h1>
