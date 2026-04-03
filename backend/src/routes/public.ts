@@ -833,8 +833,8 @@ function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
 // ============================================================
 public_routes.get("/fix-seed-ingles", async (c) => {
   try {
-    // Periodo: April 6 – August 15, 2026
-    const periodoStart = new Date("2026-04-06T00:00:00Z");
+    // Inglés starts April 22, ends with periodo August 15, 2026
+    const periodoStart = new Date("2026-04-22T00:00:00Z");
     const periodoEnd = new Date("2026-08-15T00:00:00Z");
 
     // Materias: Inglés A1 (id=7, nivel 2do), Inglés B1 (id=14, nivel 4to)
