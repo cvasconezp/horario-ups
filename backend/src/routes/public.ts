@@ -336,6 +336,7 @@ public_routes.get("/sesiones-presenciales", async (c) => {
 public_routes.get("/calendario", async (c) => {
   try {
     const periodoId = c.req.query("periodoId");
+    const nivelId = c.req.query("nivelId");
 
     if (!periodoId) {
       return c.json({ error: "periodoId is required" }, 400);
@@ -347,6 +348,12 @@ public_routes.get("/calendario", async (c) => {
       },
       orderBy: { fecha: "asc" },
     });
+
+    // Filter by nivelId: show events with nivelId=null (global) or matching nivelId
+    if (nivelId) {
+      const nId = parseInt(nivelId);
+      return c.json(eventos.filter((e) => e.nivelId === null || e.nivelId === nId));
+    }
 
     return c.json(eventos);
   } catch (error) {
@@ -405,7 +412,7 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
     const nId = parseInt(nivelId);
     const cId = parseInt(centroId);
 
-    const [periodo, nivel, centro, sesionesOnline, sesionesPresenciales, eventos] = await Promise.all([
+    const [periodo, nivel, centro, allOnlineSesiones, sesionesPresenciales, allEventos] = await Promise.all([
       prisma.periodo.findUnique({ where: { id: pId } }),
       prisma.nivel.findUnique({ where: { id: nId } }),
       prisma.centro.findUnique({ where: { id: cId } }),
@@ -429,22 +436,57 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
       return c.json({ error: "Not found" }, 404);
     }
 
+    // --- Filter online sessions by grupo & bimestre (same logic as /sesiones-online) ---
+    const zonaNorteCentros = [2, 3, 5, 6];
+    const zonaSurCentros = [1, 4];
+    const isNorte = zonaNorteCentros.includes(cId);
+    const isSur = zonaSurCentros.includes(cId);
+    const centroGrupoMap: Record<number, string> = { 5: "Amazonía Norte" };
+    const expectedGrupo = centroGrupoMap[cId] || null;
+
+    // For iCal we include BOTH bimestres (no current-bimestre filter)
+    const sesionesOnline = allOnlineSesiones.filter((s) => {
+      // Filter by grupo
+      if (cId === 7) {
+        // Todos los centros — no filter
+      } else if (expectedGrupo) {
+        if (s.grupo !== expectedGrupo) return false;
+      } else {
+        if (s.grupo !== null && s.grupo !== undefined) return false;
+      }
+      return true;
+    });
+
+    // --- Filter calendario events by nivelId ---
+    const eventos = allEventos.filter((e) => e.nivelId === null || e.nivelId === nId);
+
     const calName = `Horario ${nivel.nombre} - ${centro.nombre} - ${periodo.label}`;
     const now = formatICalDate(new Date());
 
     let ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//UPS//Horario EIB//ES",
+      "PRODID:-//PachaTech//Horario EIB//ES",
       `X-WR-CALNAME:${calName}`,
+      "X-WR-TIMEZONE:America/Guayaquil",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
+      // VTIMEZONE for Ecuador (UTC-5, no DST)
+      "BEGIN:VTIMEZONE",
+      "TZID:America/Guayaquil",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      "TZOFFSETFROM:-0500",
+      "TZOFFSETTO:-0500",
+      "TZNAME:ECT",
+      "END:STANDARD",
+      "END:VTIMEZONE",
     ];
 
-    // Online sessions as events
+    // Online sessions as events (duration: 1h30m)
     for (const s of sesionesOnline) {
       const dtStart = formatICalDateTime(s.fecha, s.hora);
-      const dtEnd = formatICalDateTime(s.fecha, s.hora, 2); // 2 hour duration
+      const dtEnd = formatICalDateTimeAdd90(s.fecha, s.hora); // 1h30m duration
       const summary = `${s.materia.nombreCorto} - ${s.tipo === "tutoria" ? "Tutoría" : "Clase"} Online`;
       const description = `Materia: ${s.materia.nombre}\\nTipo: ${s.tipo}\\nUnidad: ${s.unidad}${s.grupo ? "\\nGrupo: " + s.grupo : ""}`;
 
@@ -452,8 +494,8 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
         "BEGIN:VEVENT",
         `UID:online-${s.id}@horario-ups`,
         `DTSTAMP:${now}`,
-        `DTSTART:${dtStart}`,
-        `DTEND:${dtEnd}`,
+        `DTSTART;TZID=America/Guayaquil:${dtStart}`,
+        `DTEND;TZID=America/Guayaquil:${dtEnd}`,
         `SUMMARY:${summary}`,
         `DESCRIPTION:${description}`,
         "END:VEVENT"
@@ -464,30 +506,34 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
     for (const s of sesionesPresenciales) {
       const dtStart = formatICalDateTime(s.fecha, s.horaInicio);
       const dtEnd = formatICalDateTime(s.fecha, s.horaFin);
-      const tipoLabel = s.tipo === "examen" ? "Examen" : "Clase Presencial";
+      // Exámenes are NOT presencial — just label as "Examen"
+      const tipoLabel = s.tipo === "examen" ? "Examen" : s.tipo === "tutoria" ? "Tutoría Presencial" : "Clase Presencial";
       const summary = `${s.materia.nombreCorto} - ${tipoLabel}`;
       const description = `Materia: ${s.materia.nombre}\\nTipo: ${tipoLabel}\\nBimestre: ${s.bimestre}${s.docente ? "\\nDocente: " + s.docente.nombre : ""}`;
-      const location = centro.nombre;
+      const location = s.tipo === "examen" ? "" : centro.nombre;
 
       ics.push(
         "BEGIN:VEVENT",
         `UID:presencial-${s.id}@horario-ups`,
         `DTSTAMP:${now}`,
-        `DTSTART:${dtStart}`,
-        `DTEND:${dtEnd}`,
+        `DTSTART;TZID=America/Guayaquil:${dtStart}`,
+        `DTEND;TZID=America/Guayaquil:${dtEnd}`,
         `SUMMARY:${summary}`,
         `DESCRIPTION:${description}`,
-        `LOCATION:${location}`,
+        location ? `LOCATION:${location}` : "",
         "END:VEVENT"
       );
     }
 
-    // Calendar events
+    // Calendar events — use nota as summary, not tipo+bimestre
     for (const e of eventos) {
       const dtStart = formatICalDate(e.fecha);
-      const dtEnd = e.fechaFin ? formatICalDate(e.fechaFin) : dtStart;
-      const summary = `${e.tipo}${e.bimestre ? " - Bimestre " + e.bimestre : ""}`;
-      const description = e.nota ? e.nota.replace(/\n/g, "\\n") : "";
+      // For all-day events, DTEND should be the NEXT day (exclusive end)
+      const endDate = e.fechaFin ? new Date(e.fechaFin) : new Date(e.fecha);
+      endDate.setUTCDate(endDate.getUTCDate() + 1);
+      const dtEnd = formatICalDate(endDate);
+      // Use nota as summary (e.g. "Entrega actividad 1"), fallback to tipo
+      const summary = e.nota || `${e.tipo}${e.bimestre ? " - Bimestre " + e.bimestre : ""}`;
 
       ics.push(
         "BEGIN:VEVENT",
@@ -496,7 +542,6 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
         `DTSTART;VALUE=DATE:${dtStart}`,
         `DTEND;VALUE=DATE:${dtEnd}`,
         `SUMMARY:${summary}`,
-        description ? `DESCRIPTION:${description}` : "",
         "END:VEVENT"
       );
     }
@@ -535,6 +580,22 @@ function formatICalDateTime(d: Date, timeStr: string, addHours: number = 0): str
   const parts = timeStr.split(":");
   const hours = parseInt(parts[0]) + addHours;
   const minutes = parseInt(parts[1]) || 0;
+  const y = date.getUTCFullYear();
+  const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const h = String(hours).padStart(2, "0");
+  const mi = String(minutes).padStart(2, "0");
+  return `${y}${mo}${day}T${h}${mi}00`;
+}
+
+// Helper: format Date + time string + 1h30m for online session end time
+function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
+  const date = new Date(d);
+  const parts = timeStr.split(":");
+  let hours = parseInt(parts[0]);
+  let minutes = (parseInt(parts[1]) || 0) + 90; // add 90 minutes
+  hours += Math.floor(minutes / 60);
+  minutes = minutes % 60;
   const y = date.getUTCFullYear();
   const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");

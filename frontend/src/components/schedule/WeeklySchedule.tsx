@@ -112,9 +112,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     filteredOnline.forEach((sesion) => {
       const fecha = parseUTCDate(sesion.fecha);
       const materia = sesion.materia;
-      const duracion = materia?.duracion; // in minutes
+      const duracion = materia?.duracion || 90; // default 1h30m
       let horaFin: string | undefined;
-      if (duracion && sesion.hora) {
+      if (sesion.hora) {
         const [h, m] = sesion.hora.split(':').map(Number);
         const totalMin = h * 60 + m + duracion;
         horaFin = `${Math.floor(totalMin / 60).toString().padStart(2, '0')}:${(totalMin % 60).toString().padStart(2, '0')}`;
@@ -153,7 +153,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         titulo: sesion.materia?.nombre || 'Sesión presencial',
         subtitulo: sesion.docente?.nombre,
         tipo: 'presencial',
-        badge: sesion.tipo?.toUpperCase() === 'EXAMEN' ? 'EXAMEN PRESENCIAL' : 'TUTORÍA PRESENCIAL',
+        badge: sesion.tipo?.toUpperCase() === 'EXAMEN' ? 'EXAMEN' : 'TUTORÍA PRESENCIAL',
         badgeColor: sesion.tipo?.toUpperCase() === 'EXAMEN'
           ? { bg: '#fed7d7', text: '#742a2a' }
           : { bg: '#fefcbf', text: '#744210' },

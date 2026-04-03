@@ -59,9 +59,9 @@ export const ScheduleView: React.FC = () => {
         );
         setSesionesPresenciales(presencialesResponse.data);
 
-        // Fetch calendar events
+        // Fetch calendar events (filtered by nivelId)
         const eventosResponse = await client.get<CalendarioEvento[]>(
-          `/calendario?periodoId=${periodoId}`
+          `/calendario?periodoId=${periodoId}&nivelId=${nivelId}`
         );
         setEventos(eventosResponse.data);
       } catch (err) {
@@ -133,8 +133,6 @@ export const ScheduleView: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             <a
               href={googleCalendarUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white font-semibold text-sm rounded-lg hover:bg-green-700 transition-colors"
             >
               <Calendar size={16} />

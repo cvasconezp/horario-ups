@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Pencil,
   X,
+  Undo2,
 } from 'lucide-react';
 
 interface AsignacionFull {
@@ -119,6 +120,14 @@ export const AdminDashboard: React.FC = () => {
   // Conflicts
   const [conflicts, setConflicts] = useState<any>(null);
   const [conflictsLoading, setConflictsLoading] = useState(false);
+
+  // Change tracking: store recently modified materia IDs and their previous values
+  const [recentChanges, setRecentChanges] = useState<Array<{
+    materiaId: number;
+    prevDia: string | null;
+    prevHora: string | null;
+    timestamp: number;
+  }>>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -235,10 +244,20 @@ export const AdminDashboard: React.FC = () => {
     setSaving(true);
     setSaveMsg('');
     try {
+      // Store previous values for undo
+      const prevDia = editingAsig.materia.dia;
+      const prevHora = editingAsig.materia.hora;
+
       await client.patch(`/admin/materias/${editingAsig.materia.id}`, {
         dia: editDia || null,
         hora: editHora || null,
       });
+
+      // Track this change for undo/highlight
+      setRecentChanges((prev) => [
+        { materiaId: editingAsig.materia.id, prevDia, prevHora, timestamp: Date.now() },
+        ...prev,
+      ]);
 
       // Update local state
       setAsignaciones((prev) =>
@@ -257,6 +276,28 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleUndo = async () => {
+    if (recentChanges.length === 0) return;
+    const lastChange = recentChanges[0];
+    try {
+      await client.patch(`/admin/materias/${lastChange.materiaId}`, {
+        dia: lastChange.prevDia,
+        hora: lastChange.prevHora,
+      });
+      // Revert local state
+      setAsignaciones((prev) =>
+        prev.map((a) =>
+          a.materia.id === lastChange.materiaId
+            ? { ...a, materia: { ...a.materia, dia: lastChange.prevDia, hora: lastChange.prevHora } }
+            : a
+        )
+      );
+      setRecentChanges((prev) => prev.slice(1));
+    } catch {
+      console.error('Error al deshacer');
+    }
+  };
+
   const handleSaveSingle = async () => {
     if (!selectedSesionId) return;
     setSaving(true);
@@ -267,8 +308,18 @@ export const AdminDashboard: React.FC = () => {
       if (editFecha) patchData.fecha = editFecha;
 
       await client.patch(`/admin/sesiones-online/${selectedSesionId}`, patchData);
-      setSaveMsg('Sesión individual actualizada');
-      setTimeout(closeEditModal, 1200);
+
+      // Update local upcoming sessions list to reflect the change
+      setUpcomingSesiones((prev) =>
+        prev.map((s) =>
+          s.id === selectedSesionId
+            ? { ...s, hora: editHora || s.hora, fecha: editFecha || s.fecha }
+            : s
+        )
+      );
+
+      setSaveMsg('Sesión individual actualizada correctamente');
+      setTimeout(closeEditModal, 1500);
     } catch (err) {
       setSaveMsg('Error al guardar');
     } finally {
@@ -330,6 +381,14 @@ export const AdminDashboard: React.FC = () => {
               {copiedAll ? <Check size={16} /> : <Copy size={16} />}
               {copiedAll ? 'Copiado!' : 'Copiar filtrados'}
             </button>
+            {recentChanges.length > 0 && (
+              <button onClick={handleUndo}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition text-sm font-medium whitespace-nowrap"
+                title="Deshacer último cambio">
+                <Undo2 size={16} />
+                Deshacer ({recentChanges.length})
+              </button>
+            )}
           </div>
         </div>
 
@@ -360,10 +419,11 @@ export const AdminDashboard: React.FC = () => {
                     const bloqueLabel = getBloqueLabel(asig);
                     const bloqueColor = getBloqueColor(bloqueLabel);
                     const is2do = bloqueLabel === '2DO BLOQUE';
+                    const isRecentlyChanged = recentChanges.some((c) => c.materiaId === asig.materia.id);
 
                     return (
                       <tr key={asig.id}
-                        className={`border-b border-gray-100 hover:bg-blue-50/50 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                        className={`border-b transition ${isRecentlyChanged ? 'bg-amber-50 border-l-4 border-l-amber-400 border-b-amber-100' : `border-gray-100 hover:bg-blue-50/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}`}>
                         <td className="px-4 py-3 font-medium text-gray-900">{asig.materia.nivel.numero}°</td>
                         <td className="px-4 py-3 text-gray-700">{asig.centro.nombre}</td>
                         <td className="px-4 py-3">

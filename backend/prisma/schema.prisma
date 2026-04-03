@@ -54,7 +54,8 @@ model Nivel {
   carrera   Carrera   @relation(fields: [carreraId], references: [id], onDelete: Cascade)
   numero    Int
   nombre    String
-  materias  Materia[]
+  materias           Materia[]
+  calendarioEventos  CalendarioEvento[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -145,6 +146,8 @@ model CalendarioEvento {
   id        Int      @id @default(autoincrement())
   periodoId Int
   periodo   Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  nivelId   Int?
+  nivel     Nivel?   @relation(fields: [nivelId], references: [id], onDelete: SetNull)
   tipo      String
   fecha     DateTime
   fechaFin  DateTime?

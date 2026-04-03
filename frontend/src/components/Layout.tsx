@@ -115,7 +115,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Footer */}
       <footer className="bg-gray-800 text-gray-200 text-center py-4 mt-auto">
         <p className="text-sm">
-          Sistema de Horarios - Universidad Politécnica Salesiana © 2026
+          Sistema de Horarios - Desarrollado por{' '}
+          <a href="https://pachatech.vercel.app/" target="_blank" rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors">
+            PachaTech
+          </a>{' '}
+          2026
         </p>
       </footer>
     </div>
