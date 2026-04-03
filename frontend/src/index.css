@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium;
+  }
+
+  .btn-sm {
+    @apply px-2 py-1 text-sm;
+  }
+
+  .badge {
+    @apply inline-block px-2 py-1 rounded text-xs font-semibold;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-yellow {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-green {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-gray {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md p-4;
+  }
+
+  .schedule-row {
+    @apply border-l-4 pl-4 py-3 mb-2 bg-gray-50 rounded;
+  }
+
+  .schedule-row-lunes {
+    @apply schedule-row border-l-schedule-lunes;
+  }
+
+  .schedule-row-martes {
+    @apply schedule-row border-l-schedule-martes;
+  }
+
+  .schedule-row-miercoles {
+    @apply schedule-row border-l-schedule-miercoles;
+  }
+
+  .schedule-row-jueves {
+    @apply schedule-row border-l-schedule-jueves;
+  }
+
+  .schedule-row-viernes {
+    @apply schedule-row border-l-schedule-viernes;
+  }
+
+  .schedule-row-semestral {
+    @apply schedule-row border-l-schedule-semestral;
+  }
+
+  .schedule-row-confirmar {
+    @apply schedule-row border-l-schedule-confirmar;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  @apply bg-gray-50;
+  margin: 0;
+}
+
+#root {
+  @apply min-h-screen;
+}

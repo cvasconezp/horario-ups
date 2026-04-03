@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Carrera {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  codigo    String    @unique
+  activa    Boolean   @default(true)
+  periodos  Periodo[]
+  niveles   Nivel[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Periodo {
+  id          Int       @id @default(autoincrement())
+  carreraId   Int
+  carrera     Carrera   @relation(fields: [carreraId], references: [id], onDelete: Cascade)
+  numero      Int
+  label       String
+  fechaInicio DateTime
+  fechaFin    DateTime
+  activo      Boolean   @default(true)
+  calendario  CalendarioEvento[]
+  materias    Materia[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([carreraId, numero])
+}
+
+model Centro {
+  id           Int           @id @default(autoincrement())
+  nombre       String        @unique
+  zona         String
+  asignaciones Asignacion[]
+  presenciales SesionPresencial[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Nivel {
+  id        Int       @id @default(autoincrement())
+  carreraId Int
+  carrera   Carrera   @relation(fields: [carreraId], references: [id], onDelete: Cascade)
+  numero    Int
+  nombre    String
+  materias  Materia[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([carreraId, numero])
+}
+
+model Docente {
+  id           Int           @id @default(autoincrement())
+  nombre       String
+  email        String?       @unique
+  asignaciones Asignacion[]
+  presenciales SesionPresencial[]
+  usuario      Usuario?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Materia {
+  id           Int           @id @default(autoincrement())
+  nivelId      Int
+  nivel        Nivel         @relation(fields: [nivelId], references: [id], onDelete: Cascade)
+  periodoId    Int
+  periodo      Periodo       @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  nombre       String
+  nombreCorto  String
+  tipo         String
+  dia          String?
+  hora         String?
+  duracion     Int?
+  bimestreOC   Int           @default(0)
+  bimestreRL   Int           @default(0)
+  tutoria      String?
+  nota         String?
+  asignaciones Asignacion[]
+  sesionesOnline SesionOnline[]
+  presenciales SesionPresencial[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Asignacion {
+  id           Int       @id @default(autoincrement())
+  materiaId    Int
+  materia      Materia   @relation(fields: [materiaId], references: [id], onDelete: Cascade)
+  centroId     Int
+  centro       Centro    @relation(fields: [centroId], references: [id], onDelete: Cascade)
+  docenteId    Int
+  docente      Docente   @relation(fields: [docenteId], references: [id], onDelete: Cascade)
+  enlaceVirtual String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([materiaId, centroId])
+}
+
+model SesionOnline {
+  id        Int      @id @default(autoincrement())
+  materiaId Int
+  materia   Materia  @relation(fields: [materiaId], references: [id], onDelete: Cascade)
+  fecha     DateTime
+  hora      String
+  tipo      String
+  unidad    Int
+  grupo     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SesionPresencial {
+  id         Int      @id @default(autoincrement())
+  materiaId  Int
+  materia    Materia  @relation(fields: [materiaId], references: [id], onDelete: Cascade)
+  centroId   Int
+  centro     Centro   @relation(fields: [centroId], references: [id], onDelete: Cascade)
+  docenteId  Int?
+  docente    Docente? @relation(fields: [docenteId], references: [id], onDelete: SetNull)
+  fecha      DateTime
+  diaSemana  String
+  horaInicio String
+  horaFin    String
+  tipo       String
+  bimestre   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CalendarioEvento {
+  id        Int      @id @default(autoincrement())
+  periodoId Int
+  periodo   Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  tipo      String
+  fecha     DateTime
+  fechaFin  DateTime?
+  bimestre  Int?
+  nota      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Usuario {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  nombre       String
+  rol          String   @default("coordinador")
+  docenteId    Int?     @unique
+  docente      Docente? @relation(fields: [docenteId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
