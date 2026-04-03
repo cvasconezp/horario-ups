@@ -94,6 +94,13 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
       if (m.docente?.nombre) docenteMap.set(m.id, m.docente.nombre);
     });
 
+    // Fallback: if docente not in asignacion, try to get from presencial sessions
+    presenciales.forEach((s) => {
+      if (s.materia?.id && s.docente?.nombre && !docenteMap.has(s.materia.id)) {
+        docenteMap.set(s.materia.id, s.docente.nombre);
+      }
+    });
+
     // Filter out 2do bimestre materias
     const filteredOnline = sesionesOnline.filter((s) => {
       if (!s.materia) return true;
