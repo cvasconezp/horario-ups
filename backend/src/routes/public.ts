@@ -3,47 +3,6 @@ import prisma from "../db.js";
 
 const public_routes = new Hono();
 
-// TEMPORARY: Relocate deleted April 4 sessions to correct weekday
-public_routes.get("/fix-relocate-2026", async (c) => {
-  try {
-    // The deleted April 4 sessions were "Clase U.3" that need to be on the correct day.
-    // For Monday materias: May 4, 2026 (Monday) is the correct date for u=3 clase
-    // For Wednesday (Integración Curricular amazonia): May 6, 2026 (Wednesday)
-
-    // We need the materia IDs. Let's find them by name.
-    const results: string[] = [];
-
-    // 1. Metodología Investigación II (6to nivel, dia=Lunes, hora=17:00) → May 4
-    const metod = await prisma.materia.findFirst({ where: { nombre: { contains: 'Metodología de la Investigación Educativa II' } } });
-    if (metod) {
-      await prisma.sesionOnline.create({ data: { materiaId: metod.id, fecha: new Date('2026-05-04'), hora: '17:00', tipo: 'clase', unidad: 3 } });
-      results.push(`Created u3 for Metodología Inv II (id=${metod.id}) on 2026-05-04`);
-    }
-
-    // 2. Política y Legislación Educativa (8vo nivel, dia=Lunes, hora=17:00) → May 4 (sierra, no grupo)
-    const politica = await prisma.materia.findFirst({ where: { nombre: { contains: 'Política y Legislación Educativa' } } });
-    if (politica) {
-      // Sierra (no grupo)
-      await prisma.sesionOnline.create({ data: { materiaId: politica.id, fecha: new Date('2026-05-04'), hora: '17:00', tipo: 'clase', unidad: 3 } });
-      results.push(`Created u3 sierra for Política (id=${politica.id}) on 2026-05-04`);
-      // Amazonía (grupo=Amazonía Norte)
-      await prisma.sesionOnline.create({ data: { materiaId: politica.id, fecha: new Date('2026-05-04'), hora: '17:00', tipo: 'clase', unidad: 3, grupo: 'Amazonía Norte' } });
-      results.push(`Created u3 amazonia for Política (id=${politica.id}) on 2026-05-04`);
-    }
-
-    // 3. Integración Curricular (8vo nivel, now dia=Miércoles, hora=18:30) → May 6 (Wed, amazonia only)
-    const integ = await prisma.materia.findFirst({ where: { nombre: { contains: 'Integración Curricular: Propuesta' } } });
-    if (integ) {
-      await prisma.sesionOnline.create({ data: { materiaId: integ.id, fecha: new Date('2026-05-06'), hora: '18:30', tipo: 'clase', unidad: 3, grupo: 'Amazonía Norte' } });
-      results.push(`Created u3 amazonia for Integración Curricular (id=${integ.id}) on 2026-05-06 (Wed)`);
-    }
-
-    return c.json({ results });
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
-});
-
 // Auto-detect active periodo based on current date
 public_routes.get("/activo", async (c) => {
   try {
