@@ -42,11 +42,31 @@ public_routes.get("/activo", async (c) => {
       }),
     ]);
 
+    // Build centro→niveles mapping from actual asignaciones
+    const asignaciones = await prisma.asignacion.findMany({
+      where: {
+        materia: { periodoId: periodo.id },
+      },
+      select: {
+        centroId: true,
+        materia: { select: { nivelId: true } },
+      },
+    });
+
+    const centroNiveles: Record<number, number[]> = {};
+    asignaciones.forEach((a) => {
+      if (!centroNiveles[a.centroId]) centroNiveles[a.centroId] = [];
+      if (!centroNiveles[a.centroId].includes(a.materia.nivelId)) {
+        centroNiveles[a.centroId].push(a.materia.nivelId);
+      }
+    });
+
     return c.json({
       periodo,
       carrera: periodo.carrera,
       niveles,
       centros,
+      centroNiveles,
     });
   } catch (error) {
     return c.json({ error: "Failed to fetch active period" }, 500);

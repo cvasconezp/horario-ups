@@ -10,6 +10,7 @@ interface ActiveResponse {
   carrera: Carrera;
   niveles: Nivel[];
   centros: Centro[];
+  centroNiveles: Record<number, number[]>;
 }
 
 export const Home: React.FC = () => {
@@ -34,6 +35,11 @@ export const Home: React.FC = () => {
     };
     fetchActive();
   }, []);
+
+  const handleSelectCentro = (centroId: number) => {
+    setSelectedCentro(centroId);
+    setSelectedNivel(null); // Reset nivel when centro changes
+  };
 
   const handleViewSchedule = () => {
     if (data && selectedCentro && selectedNivel) {
@@ -61,7 +67,19 @@ export const Home: React.FC = () => {
     (c) => c.nombre.toLowerCase() !== 'todos los centros'
   );
 
-  const canView = selectedCentro && selectedNivel;
+  // Get niveles available for the selected centro
+  const nivelesDisponibles = selectedCentro
+    ? data.niveles.filter((n) =>
+        data.centroNiveles[selectedCentro]?.includes(n.id)
+      )
+    : [];
+
+  // Auto-select nivel if only one is available
+  const autoSelectedNivel =
+    nivelesDisponibles.length === 1 ? nivelesDisponibles[0].id : selectedNivel;
+
+  const canView = selectedCentro && (autoSelectedNivel || selectedNivel);
+  const finalNivel = autoSelectedNivel || selectedNivel;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -89,7 +107,7 @@ export const Home: React.FC = () => {
               {centros.map((centro) => (
                 <button
                   key={centro.id}
-                  onClick={() => setSelectedCentro(centro.id)}
+                  onClick={() => handleSelectCentro(centro.id)}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                     selectedCentro === centro.id
                       ? 'bg-blue-600 text-white shadow-md'
@@ -103,13 +121,13 @@ export const Home: React.FC = () => {
           </div>
 
           {/* Nivel Selection */}
-          {selectedCentro && (
+          {selectedCentro && nivelesDisponibles.length > 1 && (
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                 2. Selecciona tu nivel
               </label>
               <div className="flex flex-wrap gap-2">
-                {data.niveles.map((nivel) => (
+                {nivelesDisponibles.map((nivel) => (
                   <button
                     key={nivel.id}
                     onClick={() => setSelectedNivel(nivel.id)}
@@ -119,17 +137,35 @@ export const Home: React.FC = () => {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {nivel.numero}° Nivel
+                    {nivel.numero === 9 ? 'Plan Contingencia' : `${nivel.numero}° Nivel`}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Auto-selected nivel info */}
+          {selectedCentro && nivelesDisponibles.length === 1 && (
+            <div className="text-sm text-gray-600">
+              Nivel disponible: <span className="font-semibold text-gray-900">{nivelesDisponibles[0].numero === 9 ? 'Plan Contingencia' : `${nivelesDisponibles[0].numero}° Nivel`}</span>
+            </div>
+          )}
+
+          {/* No niveles for this centro */}
+          {selectedCentro && nivelesDisponibles.length === 0 && (
+            <p className="text-sm text-gray-500">
+              No hay niveles con horario para este centro.
+            </p>
+          )}
+
           {/* View Button */}
           {canView && (
             <button
-              onClick={handleViewSchedule}
+              onClick={() => {
+                if (data && selectedCentro && finalNivel) {
+                  navigate(`/horario/${data.periodo.id}/${finalNivel}/${selectedCentro}`);
+                }
+              }}
               className="btn-primary w-full py-3 text-lg font-bold rounded-xl"
             >
               Ver Horario
