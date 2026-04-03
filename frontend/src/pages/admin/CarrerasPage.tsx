@@ -60,8 +60,8 @@ export const CarrerasPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await client.get<Carrera[]>('/admin/carreras');
-      setCarreras(response.data);
+      const response = await client.get<{ data: Carrera[] }>('/admin/carreras');
+      setCarreras(response.data.data);
     } catch (err) {
       setError('Error al cargar carreras');
       console.error(err);

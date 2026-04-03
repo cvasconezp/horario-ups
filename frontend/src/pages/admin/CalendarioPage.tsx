@@ -90,11 +90,11 @@ export const CalendarioPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [eventosRes, periodosRes] = await Promise.all([
-        client.get<CalendarioEvento[]>('/admin/calendario'),
-        client.get<Periodo[]>('/admin/periodos'),
+        client.get<{ data: CalendarioEvento[] }>('/admin/calendario'),
+        client.get<{ data: Periodo[] }>('/admin/periodos'),
       ]);
-      setEventos(eventosRes.data);
-      setPeriodos(periodosRes.data);
+      setEventos(eventosRes.data.data);
+      setPeriodos(periodosRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

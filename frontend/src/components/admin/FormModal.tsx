@@ -57,7 +57,22 @@ export const FormModal: React.FC<FormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(formData);
+    // Coerce numeric values: select fields with numeric options and number fields
+    const coerced: Record<string, unknown> = { ...formData };
+    fields.forEach((field) => {
+      const val = coerced[field.name];
+      if (field.type === 'number' && val !== '' && val !== undefined && val !== null) {
+        coerced[field.name] = Number(val);
+      }
+      if (field.type === 'select' && val !== '' && val !== undefined && val !== null) {
+        // If the options have numeric values, coerce to number
+        const hasNumericOptions = field.options?.some((opt) => typeof opt.value === 'number');
+        if (hasNumericOptions) {
+          coerced[field.name] = Number(val);
+        }
+      }
+    });
+    await onSubmit(coerced);
   };
 
   if (!isOpen) return null;

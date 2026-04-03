@@ -53,8 +53,8 @@ export const CentrosPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await client.get<Centro[]>('/admin/centros');
-      setCentros(response.data);
+      const response = await client.get<{ data: Centro[] }>('/admin/centros');
+      setCentros(response.data.data);
     } catch (err) {
       setError('Error al cargar centros');
       console.error(err);

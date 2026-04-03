@@ -92,11 +92,11 @@ export const PeriodosPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [periodosRes, carrerasRes] = await Promise.all([
-        client.get<Periodo[]>('/admin/periodos'),
-        client.get<Carrera[]>('/admin/carreras'),
+        client.get<{ data: Periodo[] }>('/admin/periodos'),
+        client.get<{ data: Carrera[] }>('/admin/carreras'),
       ]);
-      setPeriodos(periodosRes.data);
-      setCarreras(carrerasRes.data);
+      setPeriodos(periodosRes.data.data);
+      setCarreras(carrerasRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

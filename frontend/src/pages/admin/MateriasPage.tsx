@@ -116,13 +116,13 @@ export const MateriasPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [materiasRes, nivelesRes, periodosRes] = await Promise.all([
-        client.get<Materia[]>('/admin/materias'),
-        client.get<Nivel[]>('/admin/niveles'),
-        client.get<Periodo[]>('/admin/periodos'),
+        client.get<{ data: Materia[] }>('/admin/materias'),
+        client.get<{ data: Nivel[] }>('/admin/niveles'),
+        client.get<{ data: Periodo[] }>('/admin/periodos'),
       ]);
-      setMaterias(materiasRes.data);
-      setNiveles(nivelesRes.data);
-      setPeriodos(periodosRes.data);
+      setMaterias(materiasRes.data.data);
+      setNiveles(nivelesRes.data.data);
+      setPeriodos(periodosRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

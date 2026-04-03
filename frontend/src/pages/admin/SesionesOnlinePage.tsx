@@ -84,11 +84,11 @@ export const SesionesOnlinePage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [sesionesRes, materiasRes] = await Promise.all([
-        client.get<SesionOnline[]>('/admin/sesiones-online'),
-        client.get<Materia[]>('/admin/materias'),
+        client.get<{ data: SesionOnline[] }>('/admin/sesiones-online'),
+        client.get<{ data: Materia[] }>('/admin/materias'),
       ]);
-      setSesiones(sesionesRes.data);
-      setMaterias(materiasRes.data);
+      setSesiones(sesionesRes.data.data);
+      setMaterias(materiasRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

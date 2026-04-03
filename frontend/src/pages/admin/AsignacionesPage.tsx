@@ -85,15 +85,15 @@ export const AsignacionesPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [asignacionesRes, materiasRes, centrosRes, docentesRes] = await Promise.all([
-        client.get<Asignacion[]>('/admin/asignaciones'),
-        client.get<Materia[]>('/admin/materias'),
-        client.get<Centro[]>('/admin/centros'),
-        client.get<Docente[]>('/admin/docentes'),
+        client.get<{ data: Asignacion[] }>('/admin/asignaciones'),
+        client.get<{ data: Materia[] }>('/admin/materias'),
+        client.get<{ data: Centro[] }>('/admin/centros'),
+        client.get<{ data: Docente[] }>('/admin/docentes'),
       ]);
-      setAsignaciones(asignacionesRes.data);
-      setMaterias(materiasRes.data);
-      setCentros(centrosRes.data);
-      setDocentes(docentesRes.data);
+      setAsignaciones(asignacionesRes.data.data);
+      setMaterias(materiasRes.data.data);
+      setCentros(centrosRes.data.data);
+      setDocentes(docentesRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

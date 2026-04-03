@@ -58,11 +58,11 @@ export const NivelesPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [nivelesRes, carrerasRes] = await Promise.all([
-        client.get<Nivel[]>('/admin/niveles'),
-        client.get<Carrera[]>('/admin/carreras'),
+        client.get<{ data: Nivel[] }>('/admin/niveles'),
+        client.get<{ data: Carrera[] }>('/admin/carreras'),
       ]);
-      setNiveles(nivelesRes.data);
-      setCarreras(carrerasRes.data);
+      setNiveles(nivelesRes.data.data);
+      setCarreras(carrerasRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

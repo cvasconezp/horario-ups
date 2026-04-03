@@ -47,8 +47,8 @@ export const DocentesPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await client.get<Docente[]>('/admin/docentes');
-      setDocentes(response.data);
+      const response = await client.get<{ data: Docente[] }>('/admin/docentes');
+      setDocentes(response.data.data);
     } catch (err) {
       setError('Error al cargar docentes');
       console.error(err);

@@ -120,15 +120,15 @@ export const PresencialesPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [sesionesRes, materiasRes, centrosRes, docentesRes] = await Promise.all([
-        client.get<SesionPresencial[]>('/admin/sesiones-presenciales'),
-        client.get<Materia[]>('/admin/materias'),
-        client.get<Centro[]>('/admin/centros'),
-        client.get<Docente[]>('/admin/docentes'),
+        client.get<{ data: SesionPresencial[] }>('/admin/sesiones-presenciales'),
+        client.get<{ data: Materia[] }>('/admin/materias'),
+        client.get<{ data: Centro[] }>('/admin/centros'),
+        client.get<{ data: Docente[] }>('/admin/docentes'),
       ]);
-      setSesiones(sesionesRes.data);
-      setMaterias(materiasRes.data);
-      setCentros(centrosRes.data);
-      setDocentes(docentesRes.data);
+      setSesiones(sesionesRes.data.data);
+      setMaterias(materiasRes.data.data);
+      setCentros(centrosRes.data.data);
+      setDocentes(docentesRes.data.data);
     } catch (err) {
       setError('Error al cargar datos');
       console.error(err);

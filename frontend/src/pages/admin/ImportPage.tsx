@@ -19,7 +19,7 @@ export const ImportPage: React.FC = () => {
       setIsLoading(true);
       setStatus({ type: null, message: '' });
 
-      await client.post('/admin/import', formData, {
+      await client.post('/admin/import-excel', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
