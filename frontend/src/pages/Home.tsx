@@ -41,12 +41,6 @@ export const Home: React.FC = () => {
     setSelectedNivel(null); // Reset nivel when centro changes
   };
 
-  const handleViewSchedule = () => {
-    if (data && selectedCentro && selectedNivel) {
-      navigate(`/horario/${data.periodo.id}/${selectedNivel}/${selectedCentro}`);
-    }
-  };
-
   if (isLoading) {
     return <LoadingSpinner fullScreen />;
   }
