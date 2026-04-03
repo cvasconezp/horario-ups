@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import type { Materia, SesionOnline, SesionPresencial, CalendarioEvento } from '../../types';
-import { Calendar, Clock, Video, MapPin, BookOpen } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, BookOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface WeeklyScheduleProps {
   materias: (Materia & {
@@ -249,6 +249,41 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     }
   };
 
+  // Separate past weeks from current/future
+  const { pastWeeks, currentAndFutureWeeks } = useMemo(() => {
+    const past: typeof weekGroups = [];
+    const currentFuture: typeof weekGroups = [];
+    let foundCurrent = false;
+
+    weekGroups.forEach((group) => {
+      if (group.weekKey === currentWeekKey) foundCurrent = true;
+      if (!foundCurrent && group.events.every((e) => e.isPast)) {
+        past.push(group);
+      } else {
+        currentFuture.push(group);
+      }
+    });
+
+    return { pastWeeks: past, currentAndFutureWeeks: currentFuture };
+  }, [weekGroups, currentWeekKey]);
+
+  // Collapsed state for past weeks
+  const [pastExpanded, setPastExpanded] = useState(false);
+
+  // Auto-scroll to current week
+  const currentWeekRef = useRef<HTMLDivElement>(null);
+  const hasScrolled = useRef(false);
+
+  useEffect(() => {
+    if (currentWeekRef.current && !hasScrolled.current) {
+      hasScrolled.current = true;
+      // Small delay to ensure layout is rendered
+      setTimeout(() => {
+        currentWeekRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
+  }, [currentAndFutureWeeks]);
+
   if (timelineEvents.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -258,106 +293,142 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     );
   }
 
+  const renderWeekSection = (
+    { weekKey, weekStart, events }: typeof weekGroups[0],
+    ref?: React.Ref<HTMLDivElement>,
+  ) => {
+    const isCurrentWeek = weekKey === currentWeekKey;
+    const allPast = events.every((e) => e.isPast);
+    const dateGroups = groupByDate(events);
+
+    return (
+      <section
+        key={weekKey}
+        ref={ref}
+        className={allPast && !isCurrentWeek ? 'opacity-60' : ''}
+      >
+        {/* Week header */}
+        <div className={`flex items-center gap-3 mb-4 pb-2 border-b-2 ${
+          isCurrentWeek ? 'border-blue-500' : 'border-gray-200'
+        }`}>
+          <Calendar size={18} className={isCurrentWeek ? 'text-blue-600' : 'text-gray-400'} />
+          <h3 className={`text-base font-bold ${
+            isCurrentWeek ? 'text-blue-700' : 'text-gray-700'
+          }`}>
+            {getWeekLabel(weekStart)}
+          </h3>
+          {isCurrentWeek && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+              SEMANA ACTUAL
+            </span>
+          )}
+        </div>
+
+        {/* Days within the week */}
+        <div className="space-y-4 ml-2">
+          {dateGroups.map(([dateKey, dayEvents]) => {
+            const date = new Date(dateKey + 'T00:00:00');
+            const isToday = dateKey === today.toISOString().slice(0, 10);
+
+            return (
+              <div key={dateKey}>
+                {/* Day header */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-sm font-semibold ${
+                    isToday ? 'text-blue-700 bg-blue-100 px-2 py-0.5 rounded' : 'text-gray-600'
+                  }`}>
+                    {formatDateLong(date)}
+                    {isToday && ' — Hoy'}
+                  </span>
+                </div>
+
+                {/* Events for the day */}
+                <div className="space-y-2 ml-4">
+                  {dayEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className={`border-l-4 ${getBorderColor(event.tipo)} ${getBgColor(event.tipo, event.isPast)} rounded-lg p-3 hover:shadow-md transition`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        {/* Time */}
+                        {event.hora && (
+                          <div className="flex items-center gap-1 text-sm font-mono font-medium text-gray-700 sm:w-32 flex-shrink-0">
+                            <Clock size={14} className="text-gray-400 flex-shrink-0" />
+                            {event.hora}
+                            {event.horaFin && ` - ${event.horaFin}`}
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm leading-tight">
+                            {event.titulo}
+                          </p>
+                          {event.subtitulo && (
+                            <p className="text-xs text-gray-600 mt-0.5">{event.subtitulo}</p>
+                          )}
+                        </div>
+
+                        {/* Badge + link */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {event.enlace && (
+                            <a
+                              href={event.enlace}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                            >
+                              Enlace
+                            </a>
+                          )}
+                          <span
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                            style={{ backgroundColor: event.badgeColor.bg, color: event.badgeColor.text }}
+                          >
+                            {getIcon(event.tipo)}
+                            {event.badge}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="space-y-8">
-      {weekGroups.map(({ weekKey, weekStart, events }) => {
-        const isCurrentWeek = weekKey === currentWeekKey;
-        const allPast = events.every((e) => e.isPast);
-        const dateGroups = groupByDate(events);
-
-        return (
-          <section key={weekKey} className={allPast ? 'opacity-60' : ''}>
-            {/* Week header */}
-            <div className={`flex items-center gap-3 mb-4 pb-2 border-b-2 ${
-              isCurrentWeek ? 'border-blue-500' : 'border-gray-200'
-            }`}>
-              <Calendar size={18} className={isCurrentWeek ? 'text-blue-600' : 'text-gray-400'} />
-              <h3 className={`text-base font-bold ${
-                isCurrentWeek ? 'text-blue-700' : 'text-gray-700'
-              }`}>
-                {getWeekLabel(weekStart)}
-              </h3>
-              {isCurrentWeek && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700">
-                  SEMANA ACTUAL
-                </span>
-              )}
+      {/* Collapsed past weeks */}
+      {pastWeeks.length > 0 && (
+        <div>
+          <button
+            onClick={() => setPastExpanded(!pastExpanded)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors mb-4 py-2 px-3 rounded-lg hover:bg-gray-100"
+          >
+            {pastExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <span>
+              {pastExpanded ? 'Ocultar semanas anteriores' : `Ver ${pastWeeks.length} semana${pastWeeks.length > 1 ? 's' : ''} anterior${pastWeeks.length > 1 ? 'es' : ''}`}
+            </span>
+          </button>
+          {pastExpanded && (
+            <div className="space-y-8">
+              {pastWeeks.map((group) => renderWeekSection(group))}
             </div>
+          )}
+        </div>
+      )}
 
-            {/* Days within the week */}
-            <div className="space-y-4 ml-2">
-              {dateGroups.map(([dateKey, dayEvents]) => {
-                const date = new Date(dateKey + 'T00:00:00');
-                const isToday = dateKey === today.toISOString().slice(0, 10);
-
-                return (
-                  <div key={dateKey}>
-                    {/* Day header */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-sm font-semibold ${
-                        isToday ? 'text-blue-700 bg-blue-100 px-2 py-0.5 rounded' : 'text-gray-600'
-                      }`}>
-                        {formatDateLong(date)}
-                        {isToday && ' — Hoy'}
-                      </span>
-                    </div>
-
-                    {/* Events for the day */}
-                    <div className="space-y-2 ml-4">
-                      {dayEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          className={`border-l-4 ${getBorderColor(event.tipo)} ${getBgColor(event.tipo, event.isPast)} rounded-lg p-3 hover:shadow-md transition`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            {/* Time */}
-                            {event.hora && (
-                              <div className="flex items-center gap-1 text-sm font-mono font-medium text-gray-700 sm:w-32 flex-shrink-0">
-                                <Clock size={14} className="text-gray-400 flex-shrink-0" />
-                                {event.hora}
-                                {event.horaFin && ` - ${event.horaFin}`}
-                              </div>
-                            )}
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 text-sm leading-tight">
-                                {event.titulo}
-                              </p>
-                              {event.subtitulo && (
-                                <p className="text-xs text-gray-600 mt-0.5">{event.subtitulo}</p>
-                              )}
-                            </div>
-
-                            {/* Badge + link */}
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {event.enlace && (
-                                <a
-                                  href={event.enlace}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs font-medium text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
-                                >
-                                  Enlace
-                                </a>
-                              )}
-                              <span
-                                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
-                                style={{ backgroundColor: event.badgeColor.bg, color: event.badgeColor.text }}
-                              >
-                                {getIcon(event.tipo)}
-                                {event.badge}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+      {/* Current and future weeks */}
+      {currentAndFutureWeeks.map((group) => {
+        const isCurrentWeek = group.weekKey === currentWeekKey;
+        return renderWeekSection(
+          group,
+          isCurrentWeek ? currentWeekRef : undefined,
         );
       })}
     </div>
