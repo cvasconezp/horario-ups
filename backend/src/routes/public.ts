@@ -199,6 +199,8 @@ public_routes.get("/sesiones-online", async (c) => {
   try {
     const periodoId = c.req.query("periodoId");
     const nivelId = c.req.query("nivelId");
+    const centroId = c.req.query("centroId");
+    const bimestre = c.req.query("bimestre");
 
     if (!periodoId || !nivelId) {
       return c.json({ error: "periodoId and nivelId are required" }, 400);
@@ -216,6 +218,50 @@ public_routes.get("/sesiones-online", async (c) => {
       },
       orderBy: { fecha: "asc" },
     });
+
+    // If centroId is provided, filter by bimestre based on zona
+    // OC zone: Otavalo (3), Cayambe (2) → use bimestreOC
+    // RL zone: Riobamba (4), Latacunga (1) → use bimestreRL
+    if (centroId) {
+      const cId = parseInt(centroId);
+      const ocCentros = [2, 3]; // Cayambe, Otavalo
+      const rlCentros = [1, 4]; // Latacunga, Riobamba
+      const isOC = ocCentros.includes(cId);
+      const isRL = rlCentros.includes(cId);
+
+      if (isOC || isRL) {
+        // Determine current bimestre from date or query param
+        let currentBimestre = bimestre ? parseInt(bimestre) : 0;
+        if (!currentBimestre) {
+          // Auto-detect: check periodo dates
+          const periodo = await prisma.periodo.findUnique({
+            where: { id: parseInt(periodoId) },
+          });
+          if (periodo) {
+            const now = new Date();
+            const inicio = new Date(periodo.fechaInicio);
+            const fin = new Date(periodo.fechaFin);
+            const mid = new Date(
+              inicio.getTime() + (fin.getTime() - inicio.getTime()) / 2
+            );
+            currentBimestre = now < mid ? 1 : 2;
+          } else {
+            currentBimestre = 1;
+          }
+        }
+
+        const filtered = sesiones.filter((s) => {
+          const mat = s.materia;
+          const bim = isOC
+            ? (mat as any).bimestreOC
+            : (mat as any).bimestreRL;
+          // 0 or null = todo el semestre (show always), otherwise must match current bimestre
+          return bim === null || bim === undefined || bim === 0 || bim === currentBimestre;
+        });
+
+        return c.json(filtered);
+      }
+    }
 
     return c.json(sesiones);
   } catch (error) {

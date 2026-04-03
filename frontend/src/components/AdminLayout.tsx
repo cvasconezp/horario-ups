@@ -59,7 +59,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
           ))}
         </nav>
 
-        <div className="p-4 border-t border-primary-700">
+        <div className="p-4 border-t border-primary-700 space-y-2">
+          <Link
+            to="/"
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-3 px-4 py-3 w-full rounded-lg hover:bg-primary-700 transition"
+          >
+            <Home size={20} />
+            <span>Ir al Inicio</span>
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 w-full rounded-lg bg-primary-700 hover:bg-primary-900 transition"

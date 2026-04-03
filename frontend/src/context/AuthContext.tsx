@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import axios from 'axios';
 import client from '../api/client';
 import type { Usuario, LoginResponse } from '../types';
@@ -15,23 +15,22 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [usuario, setUsuario] = useState<Usuario | null>(() => {
+    // Initialize synchronously from localStorage to avoid flash of unauthenticated state
+    try {
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('auth_user');
+      if (token && userData) {
+        return JSON.parse(userData);
+      }
+    } catch {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Initialize from localStorage
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('auth_user');
-    if (token && userData) {
-      try {
-        setUsuario(JSON.parse(userData));
-      } catch {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-      }
-    }
-  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);

@@ -45,9 +45,9 @@ export const ScheduleView: React.FC = () => {
         );
         setHorario(horarioResponse.data);
 
-        // Fetch online sessions
+        // Fetch online sessions (filtered by centro/bimestre)
         const onlineResponse = await client.get<SesionOnline[]>(
-          `/sesiones-online?periodoId=${periodoId}&nivelId=${nivelId}`
+          `/sesiones-online?periodoId=${periodoId}&nivelId=${nivelId}&centroId=${centroId}`
         );
         setSesionesOnline(onlineResponse.data);
 
