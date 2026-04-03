@@ -1418,8 +1418,11 @@ admin_routes.get("/conflicts", async (c) => {
       }
     }
 
-    // Check SesionPresencial conflicts
+    // Check SesionPresencial conflicts (exclude exams — they are virtual)
     const sesionesPresenciales = await prisma.sesionPresencial.findMany({
+      where: {
+        tipo: { not: 'examen' },
+      },
       include: {
         docente: true,
         centro: true,

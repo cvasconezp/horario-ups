@@ -153,7 +153,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         titulo: sesion.materia?.nombre || 'Sesión presencial',
         subtitulo: sesion.docente?.nombre,
         tipo: 'presencial',
-        badge: sesion.tipo?.toUpperCase() === 'EXAMEN' ? 'EXAMEN' : 'TUTORÍA PRESENCIAL',
+        badge: sesion.tipo?.toUpperCase() === 'EXAMEN' ? 'EXAMEN FINAL' : 'TUTORÍA PRESENCIAL',
         badgeColor: sesion.tipo?.toUpperCase() === 'EXAMEN'
           ? { bg: '#fed7d7', text: '#742a2a' }
           : { bg: '#fefcbf', text: '#744210' },

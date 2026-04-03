@@ -76,8 +76,8 @@ const formatDate = (dateStr: string): string => {
 
 const getBloqueLabel = (bimestreOC: number, bimestreRL: number, zona: string): string => {
   const bim = zona === 'RL' ? bimestreRL : bimestreOC;
-  if (bim === 1) return '1er Bim';
-  if (bim === 2) return '2do Bim';
+  if (bim === 1) return '1er Bloque';
+  if (bim === 2) return '2do Bloque';
   return 'Semestral';
 };
 

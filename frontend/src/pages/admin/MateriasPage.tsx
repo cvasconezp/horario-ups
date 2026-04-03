@@ -95,13 +95,13 @@ export const MateriasPage: React.FC = () => {
     },
     {
       name: 'bimestreOC',
-      label: 'Bimestre OC',
+      label: 'Bloque Zona Norte',
       type: 'number',
       value: editingItem?.bimestreOC || '',
     },
     {
       name: 'bimestreRL',
-      label: 'Bimestre RL',
+      label: 'Bloque Zona Sur',
       type: 'number',
       value: editingItem?.bimestreRL || '',
     },
