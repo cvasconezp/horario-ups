@@ -164,7 +164,14 @@ export const ScheduleView: React.FC = () => {
 
       {/* Tab Content */}
       <div className="bg-white rounded-lg shadow-lg p-6">
-        {activeTab === 'semanal' && <WeeklySchedule materias={horario.materias} />}
+        {activeTab === 'semanal' && (
+          <WeeklySchedule
+            materias={horario.materias}
+            presenciales={sesionesPresenciales}
+            eventos={eventos}
+            centroId={parseInt(centroId!)}
+          />
+        )}
         {activeTab === 'online' && <OnlineSessions sesiones={sesionesOnline} />}
         {activeTab === 'presenciales' && (
           <PresencialSessions sesiones={sesionesPresenciales} />

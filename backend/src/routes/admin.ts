@@ -1158,4 +1158,287 @@ admin_routes.post("/import-excel", async (c) => {
   }
 });
 
+// Conflict detection endpoint
+admin_routes.get("/conflicts", async (c) => {
+  try {
+    const conflicts: Array<{
+      type: string;
+      docenteId: number;
+      docenteNombre: string;
+      conflicts: Array<{
+        id: number;
+        materiaId: number;
+        materiaNombre: string;
+        centroId: number;
+        centroNombre: string;
+        nivelId: number;
+        nivelNumero: number;
+        dia?: string;
+        hora?: string;
+        fechaPresencial?: string;
+        horaInicio?: string;
+        horaFin?: string;
+      }>;
+    }> = [];
+
+    // Get all asignaciones with materia and nivel details
+    const asignaciones = await prisma.asignacion.findMany({
+      include: {
+        materia: { include: { nivel: true } },
+        docente: true,
+        centro: true,
+      },
+    });
+
+    // Group by docente, dia, and hora to find conflicts
+    const groupedByDocenteTimeSlot = new Map<
+      string,
+      typeof asignaciones
+    >();
+
+    for (const asig of asignaciones) {
+      if (!asig.materia.dia || !asig.materia.hora) continue;
+
+      const key = `${asig.docenteId}_${asig.materia.dia}_${asig.materia.hora}`;
+      if (!groupedByDocenteTimeSlot.has(key)) {
+        groupedByDocenteTimeSlot.set(key, []);
+      }
+      groupedByDocenteTimeSlot.get(key)!.push(asig);
+    }
+
+    // Check for conflicts where same docente has different centros or niveles at same time
+    for (const [key, group] of groupedByDocenteTimeSlot.entries()) {
+      if (group.length > 1) {
+        const centroIds = new Set(group.map((g) => g.centroId));
+        const nivelIds = new Set(group.map((g) => g.materia.nivelId));
+
+        if (centroIds.size > 1 || nivelIds.size > 1) {
+          const existing = conflicts.find(
+            (c) =>
+              c.type === "asignacion" &&
+              c.docenteId === group[0].docenteId
+          );
+
+          if (existing) {
+            existing.conflicts.push(
+              ...group.map((g) => ({
+                id: g.id,
+                materiaId: g.materiaId,
+                materiaNombre: g.materia.nombre,
+                centroId: g.centroId,
+                centroNombre: g.centro.nombre,
+                nivelId: g.materia.nivelId,
+                nivelNumero: g.materia.nivel.numero,
+                dia: g.materia.dia ?? undefined,
+                hora: g.materia.hora ?? undefined,
+              }))
+            );
+          } else {
+            conflicts.push({
+              type: "asignacion",
+              docenteId: group[0].docenteId,
+              docenteNombre: group[0].docente.nombre,
+              conflicts: group.map((g) => ({
+                id: g.id,
+                materiaId: g.materiaId,
+                materiaNombre: g.materia.nombre,
+                centroId: g.centroId,
+                centroNombre: g.centro.nombre,
+                nivelId: g.materia.nivelId,
+                nivelNumero: g.materia.nivel.numero,
+                dia: g.materia.dia ?? undefined,
+                hora: g.materia.hora ?? undefined,
+              })),
+            });
+          }
+        }
+      }
+    }
+
+    // Check SesionPresencial conflicts
+    const sesionesPresenciales = await prisma.sesionPresencial.findMany({
+      include: {
+        docente: true,
+        centro: true,
+        materia: true,
+      },
+    });
+
+    const groupedByDocenteFecha = new Map<
+      string,
+      typeof sesionesPresenciales
+    >();
+
+    for (const sesion of sesionesPresenciales) {
+      if (!sesion.docenteId) continue;
+
+      const fechaStr = sesion.fecha.toISOString().split("T")[0];
+      const key = `${sesion.docenteId}_${fechaStr}`;
+
+      if (!groupedByDocenteFecha.has(key)) {
+        groupedByDocenteFecha.set(key, []);
+      }
+      groupedByDocenteFecha.get(key)!.push(sesion);
+    }
+
+    // Check for overlapping time ranges
+    for (const [key, group] of groupedByDocenteFecha.entries()) {
+      if (group.length > 1) {
+        for (let i = 0; i < group.length; i++) {
+          for (let j = i + 1; j < group.length; j++) {
+            const sesion1 = group[i];
+            const sesion2 = group[j];
+
+            // Parse times (assuming format "HH:MM")
+            const [h1, m1] = sesion1.horaInicio.split(":").map(Number);
+            const [h2, m2] = sesion1.horaFin.split(":").map(Number);
+            const [h3, m3] = sesion2.horaInicio.split(":").map(Number);
+            const [h4, m4] = sesion2.horaFin.split(":").map(Number);
+
+            const time1Start = h1 * 60 + m1;
+            const time1End = h2 * 60 + m2;
+            const time2Start = h3 * 60 + m3;
+            const time2End = h4 * 60 + m4;
+
+            // Check if times overlap
+            if (!(time1End <= time2Start || time2End <= time1Start)) {
+              const existing = conflicts.find(
+                (c) =>
+                  c.type === "presencial" &&
+                  c.docenteId === sesion1.docenteId
+              );
+
+              const conflictData = {
+                id: sesion1.id,
+                materiaId: sesion1.materiaId,
+                materiaNombre: sesion1.materia.nombre,
+                centroId: sesion1.centroId,
+                centroNombre: sesion1.centro.nombre,
+                nivelId: sesion1.materia.nivelId,
+                nivelNumero: 0,
+                fechaPresencial: sesion1.fecha
+                  .toISOString()
+                  .split("T")[0],
+                horaInicio: sesion1.horaInicio,
+                horaFin: sesion1.horaFin,
+              };
+
+              const conflictData2 = {
+                id: sesion2.id,
+                materiaId: sesion2.materiaId,
+                materiaNombre: sesion2.materia.nombre,
+                centroId: sesion2.centroId,
+                centroNombre: sesion2.centro.nombre,
+                nivelId: sesion2.materia.nivelId,
+                nivelNumero: 0,
+                fechaPresencial: sesion2.fecha
+                  .toISOString()
+                  .split("T")[0],
+                horaInicio: sesion2.horaInicio,
+                horaFin: sesion2.horaFin,
+              };
+
+              if (existing) {
+                if (
+                  !existing.conflicts.find(
+                    (c) => c.id === sesion1.id
+                  )
+                ) {
+                  existing.conflicts.push(conflictData);
+                }
+                if (
+                  !existing.conflicts.find(
+                    (c) => c.id === sesion2.id
+                  )
+                ) {
+                  existing.conflicts.push(conflictData2);
+                }
+              } else {
+                conflicts.push({
+                  type: "presencial",
+                  docenteId: sesion1.docenteId!,
+                  docenteNombre: sesion1.docente!.nombre,
+                  conflicts: [conflictData, conflictData2],
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return c.json({
+      conflictCount: conflicts.length,
+      conflicts,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to detect conflicts" }, 500);
+  }
+});
+
+// WhatsApp export endpoint
+admin_routes.get("/whatsapp-export", async (c) => {
+  try {
+    const nivelId = c.req.query("nivelId")
+      ? parseInt(c.req.query("nivelId")!)
+      : undefined;
+    const centroId = c.req.query("centroId")
+      ? parseInt(c.req.query("centroId")!)
+      : undefined;
+
+    // Build where clause
+    const where: any = {};
+
+    if (nivelId) {
+      where.materia = { nivelId };
+    }
+    if (centroId) {
+      where.centroId = centroId;
+    }
+
+    const asignaciones = await prisma.asignacion.findMany({
+      where,
+      include: {
+        materia: { include: { nivel: true } },
+        docente: true,
+        centro: true,
+      },
+      orderBy: [{ centro: { nombre: "asc" } }, { materia: { dia: "asc" } }],
+    });
+
+    // Generate bimestre label helper
+    const getBimestreLabel = (
+      bimestreOC: number,
+      bimestreRL: number
+    ): string => {
+      if (bimestreOC > 0) return `Bimestre ${bimestreOC}`;
+      if (bimestreRL > 0) return `Reclasificación ${bimestreRL}`;
+      return "S/B";
+    };
+
+    // Format each asignacion for WhatsApp
+    const formattedEntries = asignaciones.map((asig) => {
+      const bimestreLabel = getBimestreLabel(
+        asig.materia.bimestreOC,
+        asig.materia.bimestreRL
+      );
+
+      return `*${asig.materia.nombreCorto}*
+Nivel: ${asig.materia.nivel.numero}° | Centro: ${asig.centro.nombre}
+Docente: ${asig.docente.nombre}
+Día: ${asig.materia.dia} | Hora: ${asig.materia.hora}
+Bloque: ${bimestreLabel}`;
+    });
+
+    const text = formattedEntries.join("\n\n─────\n\n");
+
+    return c.json({
+      text,
+      count: asignaciones.length,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to export WhatsApp text" }, 500);
+  }
+});
+
 export default admin_routes;
