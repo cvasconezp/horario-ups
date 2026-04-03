@@ -99,10 +99,10 @@ export const Login: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-600 text-sm mt-6">
-          ¿Necesitas ayuda? Contacta con soporte{' '}
-          <a href="mailto:soporte@ups.edu.ec" className="text-blue-600 hover:text-blue-700">
-            soporte@ups.edu.ec
+        <p className="text-center text-gray-500 text-xs mt-6">
+          Carlos Vásconez —{' '}
+          <a href="mailto:cvasconez@ups.edu.ec" className="text-gray-500 hover:text-gray-700">
+            cvasconez@ups.edu.ec
           </a>
         </p>
       </div>
