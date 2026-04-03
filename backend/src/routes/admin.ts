@@ -13,6 +13,38 @@ import {
 
 const admin_routes = new Hono();
 
+// Dashboard stats
+admin_routes.get("/stats", async (c) => {
+  try {
+    const [
+      totalCarreras,
+      totalDocentes,
+      totalMaterias,
+      totalCentros,
+      totalSesionesOnline,
+      totalSesionesPresenciales,
+    ] = await Promise.all([
+      prisma.carrera.count(),
+      prisma.docente.count(),
+      prisma.materia.count(),
+      prisma.centro.count(),
+      prisma.sesionOnline.count(),
+      prisma.sesionPresencial.count(),
+    ]);
+
+    return c.json({
+      totalCarreras,
+      totalDocentes,
+      totalMaterias,
+      totalCentros,
+      totalSesionesOnline,
+      totalSesionesPresenciales,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to fetch stats" }, 500);
+  }
+});
+
 const ITEMS_PER_PAGE = 50;
 
 const getPaginationParams = (c: any) => {

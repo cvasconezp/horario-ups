@@ -44,7 +44,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link to="/" className="hover:opacity-80 transition">
                 Inicio
               </Link>
-              {isAuthenticated && usuario?.rol === 'admin' && (
+              {isAuthenticated && ['superadmin', 'coordinador'].includes(usuario?.rol || '') && (
                 <Link to="/admin" className="hover:opacity-80 transition">
                   Admin
                 </Link>
@@ -79,7 +79,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link to="/" className="hover:opacity-80 transition py-2">
                 Inicio
               </Link>
-              {isAuthenticated && usuario?.rol === 'admin' && (
+              {isAuthenticated && ['superadmin', 'coordinador'].includes(usuario?.rol || '') && (
                 <Link to="/admin" className="hover:opacity-80 transition py-2">
                   Admin
                 </Link>
