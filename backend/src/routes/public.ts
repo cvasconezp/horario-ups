@@ -828,4 +828,95 @@ function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// ============================================================
+// TEMPORARY: Seed Inglés sessions for 2do and 4to nivel
+// ============================================================
+public_routes.get("/fix-seed-ingles", async (c) => {
+  try {
+    // Periodo: April 6 – August 15, 2026
+    const periodoStart = new Date("2026-04-06T00:00:00Z");
+    const periodoEnd = new Date("2026-08-15T00:00:00Z");
+
+    // Materias: Inglés A1 (id=7, nivel 2do), Inglés B1 (id=14, nivel 4to)
+    const materias = [
+      { id: 7, nombre: "Inglés A1" },
+      { id: 14, nombre: "Inglés B1" },
+    ];
+
+    const results: any[] = [];
+
+    for (const mat of materias) {
+      // Check existing sessions
+      const existing = await prisma.sesionOnline.count({
+        where: { materiaId: mat.id },
+      });
+      if (existing > 0) {
+        results.push({ materia: mat.nombre, skipped: true, existing });
+        continue;
+      }
+
+      const sessions: { materiaId: number; fecha: Date; hora: string; tipo: string; unidad: number; grupo: null }[] = [];
+
+      // Generate Wednesday & Friday class sessions (18:30-20:30)
+      let unidadClase = 1;
+      const d = new Date(periodoStart);
+      while (d <= periodoEnd) {
+        const dayOfWeek = d.getUTCDay(); // 0=Sun, 3=Wed, 5=Fri
+        if (dayOfWeek === 3 || dayOfWeek === 5) {
+          sessions.push({
+            materiaId: mat.id,
+            fecha: new Date(d),
+            hora: "18:30",
+            tipo: "clase",
+            unidad: unidadClase,
+            grupo: null,
+          });
+          // Increment unidad every 4 class sessions (approx every 2 weeks)
+          if (sessions.filter(s => s.tipo === "clase").length % 4 === 0) {
+            unidadClase++;
+          }
+        }
+        d.setUTCDate(d.getUTCDate() + 1);
+      }
+
+      // Generate Thursday tutoría sessions (16:00-17:00)
+      let unidadTut = 1;
+      let tutCount = 0;
+      const dt = new Date(periodoStart);
+      while (dt <= periodoEnd) {
+        const dayOfWeek = dt.getUTCDay(); // 4=Thu
+        if (dayOfWeek === 4) {
+          sessions.push({
+            materiaId: mat.id,
+            fecha: new Date(dt),
+            hora: "16:00",
+            tipo: "tutoria",
+            unidad: unidadTut,
+            grupo: null,
+          });
+          tutCount++;
+          if (tutCount % 2 === 0) unidadTut++;
+        }
+        dt.setUTCDate(dt.getUTCDate() + 1);
+      }
+
+      // Bulk create
+      const created = await prisma.sesionOnline.createMany({ data: sessions });
+
+      results.push({
+        materia: mat.nombre,
+        materiaId: mat.id,
+        claseSessions: sessions.filter(s => s.tipo === "clase").length,
+        tutoriaSessions: sessions.filter(s => s.tipo === "tutoria").length,
+        total: created.count,
+      });
+    }
+
+    return c.json({ success: true, results });
+  } catch (error) {
+    console.error("[Seed Inglés Error]", error);
+    return c.json({ error: "Failed to seed Inglés sessions", details: String(error) }, 500);
+  }
+});
+
 export default public_routes;
