@@ -3,6 +3,56 @@ import prisma from "../db.js";
 
 const public_routes = new Hono();
 
+// Auto-detect active periodo based on current date
+public_routes.get("/activo", async (c) => {
+  try {
+    const now = new Date();
+
+    // Find the active periodo that covers the current date (or the most recent active one)
+    let periodo = await prisma.periodo.findFirst({
+      where: {
+        activo: true,
+        fechaInicio: { lte: now },
+        fechaFin: { gte: now },
+      },
+      include: { carrera: true },
+      orderBy: { fechaInicio: "desc" },
+    });
+
+    // If no periodo covers today, get the nearest upcoming active one
+    if (!periodo) {
+      periodo = await prisma.periodo.findFirst({
+        where: { activo: true },
+        include: { carrera: true },
+        orderBy: { fechaInicio: "desc" },
+      });
+    }
+
+    if (!periodo) {
+      return c.json({ error: "No hay período activo" }, 404);
+    }
+
+    const [niveles, centros] = await Promise.all([
+      prisma.nivel.findMany({
+        where: { carreraId: periodo.carreraId },
+        orderBy: { numero: "asc" },
+      }),
+      prisma.centro.findMany({
+        orderBy: { nombre: "asc" },
+      }),
+    ]);
+
+    return c.json({
+      periodo,
+      carrera: periodo.carrera,
+      niveles,
+      centros,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to fetch active period" }, 500);
+  }
+});
+
 public_routes.get("/carreras", async (c) => {
   try {
     const carreras = await prisma.carrera.findMany({

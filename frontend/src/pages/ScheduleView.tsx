@@ -113,23 +113,10 @@ export const ScheduleView: React.FC = () => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <div className="mb-4">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Horario - {horario.periodo.label}
+          <h1 className="text-2xl font-bold text-gray-900">
+            {horario.nivel.nombre} — {horario.centro.nombre}
           </h1>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-gray-600">Carrera</p>
-              <p className="font-semibold text-gray-900">{horario.nivel.nombre}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Centro</p>
-              <p className="font-semibold text-gray-900">{horario.centro.nombre}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Período</p>
-              <p className="font-semibold text-gray-900">{horario.periodo.label}</p>
-            </div>
-          </div>
+          <p className="text-sm text-gray-500 mt-1">{horario.periodo.label}</p>
         </div>
 
         {/* Calendar Subscription Buttons */}
