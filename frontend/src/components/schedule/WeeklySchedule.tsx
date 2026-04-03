@@ -89,9 +89,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     // Build lookups from materias prop (which has asignacion data)
     const enlaceMap = new Map<number, string>();
     const docenteMap = new Map<number, string>();
+    const notaMap = new Map<number, string>();
     materias.forEach((m) => {
       if (m.enlaceVirtual) enlaceMap.set(m.id, m.enlaceVirtual);
       if (m.docente?.nombre) docenteMap.set(m.id, m.docente.nombre);
+      if (m.nota) notaMap.set(m.id, m.nota);
     });
 
     // Fallback: if docente not in asignacion, try to get from presencial sessions
@@ -129,7 +131,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         titulo: materia?.nombre || 'Sesión en línea',
         subtitulo: [
           materia ? `${sesion.tipo} U.${sesion.unidad}` : undefined,
-          materia ? docenteMap.get(materia.id) : undefined,
+          materia ? (notaMap.get(materia.id) || docenteMap.get(materia.id)) : undefined,
         ].filter(Boolean).join(' · ') || undefined,
         tipo: 'online',
         badge: sesion.tipo?.toUpperCase() === 'TUTORÍA' ? 'TUTORÍA EN LÍNEA' : 'CLASE EN LÍNEA',

@@ -828,4 +828,38 @@ function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// TEMPORARY: Update Lengua Indígena notas with docente groups
+public_routes.get("/fix-lengua-notas", async (c) => {
+  try {
+    const updates = [
+      {
+        id: 13, // Lengua Indígena I (4to nivel)
+        nota: "Diana Guitarra (Grupo 1 y 2), Soledad Guzmán (Grupo 3 y 4)",
+      },
+      {
+        id: 20, // Lengua Indígena III (6to nivel)
+        nota: "Soledad Guzmán (Grupo 1), Diana Guitarra (Grupo 2), Fernando Garcés (Grupo 3), Aurora Iza (Grupo 4)",
+      },
+      {
+        id: 25, // Lengua Indígena V (8vo nivel)
+        nota: "Aurora Iza (Grupo 1), Luis Montaluisa (Grupo 2), Fernando Garcés (Grupo 3), Luis Montaluisa (Grupo 4), Luis Montaluisa (Grupo 5), Soledad Guzmán (Wasakentsa)",
+      },
+    ];
+
+    const results = [];
+    for (const u of updates) {
+      const materia = await prisma.materia.update({
+        where: { id: u.id },
+        data: { nota: u.nota },
+      });
+      results.push({ id: materia.id, nombre: materia.nombre, nota: materia.nota });
+    }
+
+    return c.json({ success: true, results });
+  } catch (error) {
+    console.error("[Fix Lengua Notas Error]", error);
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
 export default public_routes;

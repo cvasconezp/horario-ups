@@ -651,6 +651,7 @@ admin_routes.patch("/materias/:id", async (c) => {
     if (body.dia !== undefined) data.dia = body.dia;
     if (body.hora !== undefined) data.hora = body.hora;
     if (body.duracion !== undefined) data.duracion = body.duracion;
+    if (body.nota !== undefined) data.nota = body.nota;
 
     const materia = await prisma.materia.update({
       where: { id: parseInt(c.req.param("id")) },
