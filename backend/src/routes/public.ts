@@ -757,15 +757,17 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
       // Use nota as summary (e.g. "Entrega actividad 1"), fallback to tipo
       const summary = e.nota || `${e.tipo}${e.bimestre ? " - Bimestre " + e.bimestre : ""}`;
 
-      ics.push(
+      const eventLines = [
         "BEGIN:VEVENT",
         `UID:evento-${e.id}@horario-ups`,
         `DTSTAMP:${now}`,
         `DTSTART;VALUE=DATE:${dtStart}`,
         `DTEND;VALUE=DATE:${dtEnd}`,
         `SUMMARY:${summary}`,
-        "END:VEVENT"
-      );
+      ];
+      if (e.enlace) eventLines.push(`URL:${e.enlace}`);
+      eventLines.push("END:VEVENT");
+      ics.push(...eventLines);
     }
 
     ics.push("END:VCALENDAR");

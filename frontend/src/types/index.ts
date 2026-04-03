@@ -96,6 +96,7 @@ export interface CalendarioEvento {
   fechaFin: string | null;
   bimestre: number | null;
   nota: string | null;
+  enlace: string | null;
 }
 
 export interface HorarioResponse {

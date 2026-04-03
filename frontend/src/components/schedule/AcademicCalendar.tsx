@@ -1,4 +1,5 @@
 import React from 'react';
+import { ExternalLink } from 'lucide-react';
 import type { CalendarioEvento } from '../../types';
 import { parseUTCDate, formatSpanishDate, spanishMonths } from '../../utils/dates';
 
@@ -117,6 +118,18 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
                           <div>
                             <p className="text-xs font-semibold uppercase opacity-75">Descripción</p>
                             <p>{evento.nota || '-'}</p>
+                            {evento.enlace && (
+                              <a
+                                href={evento.enlace}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 mt-1 text-sm font-medium underline hover:opacity-80"
+                                style={{ color: typeColor.text }}
+                              >
+                                <ExternalLink size={14} />
+                                Enlace
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>

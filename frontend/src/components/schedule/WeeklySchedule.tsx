@@ -209,6 +209,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
         tipo: 'evento',
         badge: eventoBadgeLabel(evento.tipo),
         badgeColor: eventoBadgeColor(evento.tipo),
+        enlace: evento.enlace || null,
         isPast: fecha < today,
       });
     });
