@@ -5,6 +5,50 @@ interface AcademicCalendarProps {
   eventos: CalendarioEvento[];
 }
 
+const spanishDays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const spanishMonths = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+const formatSpanishDate = (date: Date): string => {
+  const dayName = spanishDays[date.getDay()];
+  const dayNum = date.getDate();
+  const monthName = spanishMonths[date.getMonth()];
+  return `${dayName} ${dayNum} de ${monthName}`;
+};
+
+const getBimestreLabel = (bimestre: number | null): string => {
+  if (bimestre === 1) return '1er Bimestre';
+  if (bimestre === 2) return '2do Bimestre';
+  return 'General';
+};
+
+const getTypeColor = (tipo: string): { bg: string; text: string; borderColor: string } => {
+  const tipo_lower = tipo.toLowerCase();
+  if (tipo_lower.includes('feriado') || tipo_lower.includes('vacaciones'))
+    return { bg: '#fed7d7', text: '#9b2c2c', borderColor: '#c53030' };
+  if (tipo_lower.includes('examen'))
+    return { bg: '#e9d8fd', text: '#553399', borderColor: '#805ad5' };
+  if (tipo_lower.includes('evaluacion') || tipo_lower.includes('evaluación'))
+    return { bg: '#feebc8', text: '#7c2d12', borderColor: '#ed8936' };
+  if (tipo_lower.includes('entrega'))
+    return { bg: '#bee3f8', text: '#2a4365', borderColor: '#3182ce' };
+  if (tipo_lower.includes('recuperacion') || tipo_lower.includes('recuperación'))
+    return { bg: '#c6f6d5', text: '#22543d', borderColor: '#38a169' };
+  return { bg: '#e2e8f0', text: '#2d3748', borderColor: '#718096' };
+};
+
 export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) => {
   // Sort by date
   const sortedEventos = [...eventos].sort((a, b) => {
@@ -13,90 +57,106 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
     return dateA.getTime() - dateB.getTime();
   });
 
-  const getTypeColor = (tipo: string): string => {
-    const tipo_lower = tipo.toLowerCase();
-    if (tipo_lower.includes('feriado') || tipo_lower.includes('vacaciones'))
-      return 'bg-red-100 border-l-red-500 text-red-900';
-    if (tipo_lower.includes('examen'))
-      return 'bg-purple-100 border-l-purple-500 text-purple-900';
-    if (tipo_lower.includes('evaluacion'))
-      return 'bg-orange-100 border-l-orange-500 text-orange-900';
-    if (tipo_lower.includes('entrega'))
-      return 'bg-blue-100 border-l-blue-500 text-blue-900';
-    return 'bg-gray-100 border-l-gray-500 text-gray-900';
-  };
+  // Group by bimestre first, then by month within bimestre
+  const eventosByBimestre: Record<string, Record<string, typeof eventos>> = {};
+  const bimestreOrder: string[] = [];
 
-  // Group by month
-  const eventosByMonth: Record<string, typeof eventos> = {};
   sortedEventos.forEach((evento) => {
+    const bimestreLabel = getBimestreLabel(evento.bimestre);
     const monthKey = new Date(evento.fecha).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
     });
-    if (!eventosByMonth[monthKey]) {
-      eventosByMonth[monthKey] = [];
+
+    if (!eventosByBimestre[bimestreLabel]) {
+      eventosByBimestre[bimestreLabel] = {};
+      bimestreOrder.push(bimestreLabel);
     }
-    eventosByMonth[monthKey].push(evento);
+
+    if (!eventosByBimestre[bimestreLabel][monthKey]) {
+      eventosByBimestre[bimestreLabel][monthKey] = [];
+    }
+
+    eventosByBimestre[bimestreLabel][monthKey].push(evento);
   });
 
   return (
-    <div className="space-y-6">
-      {Object.entries(eventosByMonth).map(([month, eventos]) => (
-        <div key={month}>
-          <h3 className="text-lg font-bold text-gray-900 mb-3 capitalize">{month}</h3>
-          <div className="space-y-2">
-            {eventos.map((evento) => {
-              const fechaInicio = new Date(evento.fecha);
-              const formattedDate = fechaInicio.toLocaleDateString('es-ES', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              });
+    <div className="space-y-8">
+      {bimestreOrder.map((bimestreLabel) => (
+        <div key={bimestreLabel}>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{bimestreLabel}</h2>
+          <div className="space-y-6">
+            {Object.entries(eventosByBimestre[bimestreLabel]).map(([month, eventosEnMes]) => (
+              <div key={month}>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 capitalize">{month}</h3>
+                <div className="space-y-2">
+                  {eventosEnMes.map((evento) => {
+                    const fechaInicio = new Date(evento.fecha);
+                    const formattedDate = formatSpanishDate(fechaInicio);
+                    const typeColor = getTypeColor(evento.tipo);
 
-              let formattedEnd = '';
-              if (evento.fechaFin && evento.fechaFin !== evento.fecha) {
-                const fechaFin = new Date(evento.fechaFin);
-                formattedEnd = ' - ' + fechaFin.toLocaleDateString('es-ES', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                });
-              }
+                    let formattedEnd = '';
+                    if (evento.fechaFin && evento.fechaFin !== evento.fecha) {
+                      const fechaFin = new Date(evento.fechaFin);
+                      formattedEnd = ' - ' + formatSpanishDate(fechaFin);
+                    }
 
-              return (
-                <div
-                  key={evento.id}
-                  className={`border-l-4 pl-4 py-3 rounded ${getTypeColor(evento.tipo)} hover:shadow-md transition`}
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase opacity-75">Fecha</p>
-                      <p className="font-medium">
-                        {formattedDate}
-                        {formattedEnd}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase opacity-75">Tipo</p>
-                      <span className="inline-block badge text-xs font-semibold">
-                        {evento.tipo}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase opacity-75">Descripción</p>
-                      <p>{evento.nota || '-'}</p>
-                    </div>
-                  </div>
-                  {evento.bimestre && (
-                    <div className="mt-2">
-                      <span className="badge badge-blue text-xs">
-                        Bimestre {evento.bimestre}
-                      </span>
-                    </div>
-                  )}
+                    return (
+                      <div
+                        key={evento.id}
+                        className="border-l-4 pl-4 py-3 rounded hover:shadow-md transition bg-white"
+                        style={{
+                          backgroundColor: typeColor.bg,
+                          borderColor: typeColor.borderColor,
+                          color: typeColor.text,
+                        }}
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <p
+                              className="text-xs font-semibold uppercase opacity-75"
+                              style={{ color: typeColor.text }}
+                            >
+                              Fecha
+                            </p>
+                            <p className="font-medium" style={{ color: typeColor.text }}>
+                              {formattedDate}
+                              {formattedEnd}
+                            </p>
+                          </div>
+                          <div>
+                            <p
+                              className="text-xs font-semibold uppercase opacity-75"
+                              style={{ color: typeColor.text }}
+                            >
+                              Tipo
+                            </p>
+                            <span
+                              className="inline-block text-xs font-semibold px-3 py-1 rounded"
+                              style={{
+                                backgroundColor: typeColor.borderColor,
+                                color: 'white',
+                              }}
+                            >
+                              {evento.tipo}
+                            </span>
+                          </div>
+                          <div>
+                            <p
+                              className="text-xs font-semibold uppercase opacity-75"
+                              style={{ color: typeColor.text }}
+                            >
+                              Descripción
+                            </p>
+                            <p style={{ color: typeColor.text }}>{evento.nota || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       ))}

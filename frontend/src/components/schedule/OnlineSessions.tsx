@@ -5,6 +5,41 @@ interface OnlineSessionsProps {
   sesiones: SesionOnline[];
 }
 
+const spanishDays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const spanishMonths = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+const getWeekStartDate = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+  return new Date(d.setDate(diff));
+};
+
+const formatSpanishDate = (date: Date): string => {
+  const dayName = spanishDays[date.getDay()];
+  const dayNum = date.getDate();
+  const monthName = spanishMonths[date.getMonth()];
+  return `${dayName} ${dayNum} de ${monthName}`;
+};
+
+const getWeekKey = (date: Date): string => {
+  const weekStart = getWeekStartDate(date);
+  return weekStart.toISOString().split('T')[0];
+};
+
 export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
   // Sort by date and time
   const sortedSesiones = [...sesiones].sort((a, b) => {
@@ -13,73 +48,97 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
     return dateA.getTime() - dateB.getTime();
   });
 
-  // Group by month
-  const sesioniesByMonth: Record<string, typeof sesiones> = {};
+  // Group by week
+  const sesioniesByWeek: Record<string, typeof sesiones> = {};
+  const weekOrder: string[] = [];
+
   sortedSesiones.forEach((sesion) => {
-    const monthKey = new Date(sesion.fecha).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-    });
-    if (!sesioniesByMonth[monthKey]) {
-      sesioniesByMonth[monthKey] = [];
+    const weekKey = getWeekKey(new Date(sesion.fecha));
+    if (!sesioniesByWeek[weekKey]) {
+      sesioniesByWeek[weekKey] = [];
+      weekOrder.push(weekKey);
     }
-    sesioniesByMonth[monthKey].push(sesion);
+    sesioniesByWeek[weekKey].push(sesion);
   });
+
+  // Get the current time for highlighting upcoming sessions
+  const now = new Date();
 
   return (
     <div className="space-y-6">
-      {Object.entries(sesioniesByMonth).map(([month, sesiones]) => (
-        <div key={month}>
-          <h3 className="text-lg font-bold text-gray-900 mb-3 capitalize">{month}</h3>
-          <div className="space-y-2">
-            {sesiones.map((sesion) => {
-              const fecha = new Date(sesion.fecha);
-              const formattedDate = fecha.toLocaleDateString('es-ES', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              });
+      {weekOrder.map((weekKey) => {
+        const sesionesEnSemana = sesioniesByWeek[weekKey];
+        const weekStart = new Date(weekKey);
+        const weekStartSpanish = formatSpanishDate(weekStart);
 
-              return (
-                <div
-                  key={sesion.id}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Fecha</p>
-                      <p className="font-medium text-gray-900">{formattedDate}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Hora</p>
-                      <p className="font-medium text-gray-900">{sesion.hora}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Materia</p>
-                      <p className="font-medium text-gray-900">{sesion.materia?.nombre}</p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <span className="badge badge-blue text-xs self-start">
-                        {sesion.tipo}
-                      </span>
-                      {sesion.unidad > 0 && (
-                        <span className="badge badge-gray text-xs self-start">
-                          Unidad {sesion.unidad}
+        return (
+          <div key={weekKey}>
+            <h3 className="text-lg font-bold text-gray-900 mb-3">Semana del {weekStartSpanish}</h3>
+            <div className="space-y-2">
+              {sesionesEnSemana.map((sesion) => {
+                const fechaCompleta = new Date(`${sesion.fecha}T${sesion.hora}`);
+                const isPast = fechaCompleta < now;
+                const isNextUpcoming =
+                  !isPast &&
+                  sesionesEnSemana.every(
+                    (s) => new Date(`${s.fecha}T${s.hora}`) >= fechaCompleta
+                  );
+
+                const formattedDate = formatSpanishDate(new Date(sesion.fecha));
+
+                return (
+                  <div
+                    key={sesion.id}
+                    className={`rounded-lg p-4 transition ${
+                      isPast
+                        ? 'opacity-50 bg-gray-50 border border-gray-200'
+                        : isNextUpcoming
+                          ? 'border-l-4 border-l-blue-600 bg-blue-50 border border-blue-200'
+                          : 'bg-white border border-gray-200'
+                    } hover:shadow-md`}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Fecha</p>
+                        <p className="font-medium text-gray-900">{formattedDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Hora</p>
+                        <p className="font-medium text-gray-900">{sesion.hora}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Materia</p>
+                        <p className="font-medium text-gray-900">{sesion.materia?.nombre}</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <span
+                          className="text-xs font-semibold px-3 py-1 rounded self-start"
+                          style={{
+                            backgroundColor: '#bee3f8',
+                            color: '#2a4365',
+                          }}
+                        >
+                          {sesion.tipo?.toUpperCase()}
                         </span>
-                      )}
-                      {sesion.grupo && (
-                        <span className="badge badge-green text-xs self-start">
-                          {sesion.grupo}
-                        </span>
-                      )}
+                        {sesion.unidad > 0 && (
+                          <span className="text-xs font-semibold px-3 py-1 rounded self-start bg-gray-200 text-gray-800">
+                            U.{sesion.unidad}
+                          </span>
+                        )}
+                        {sesion.grupo && (
+                          <span className="badge badge-green text-xs self-start">
+                            {sesion.grupo}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {sesiones.length === 0 && (
         <p className="text-gray-500 text-center py-8">
