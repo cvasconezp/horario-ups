@@ -670,6 +670,38 @@ admin_routes.patch("/materias/:id", async (c) => {
       });
     }
 
+    // Also update dates on ALL future SesionOnline for this materia if dia changed
+    if (body.dia !== undefined && body.dia !== null) {
+      const dayMap: Record<string, number> = {
+        'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Domingo': 0
+      };
+      const targetDay = dayMap[body.dia];
+      if (targetDay !== undefined) {
+        const now = new Date();
+        const futureSessions = await prisma.sesionOnline.findMany({
+          where: {
+            materiaId: parseInt(c.req.param("id")),
+            fecha: { gte: now },
+          },
+          orderBy: { fecha: 'asc' },
+        });
+        for (const s of futureSessions) {
+          const currentDay = s.fecha.getUTCDay();
+          if (currentDay !== targetDay) {
+            let diff = targetDay - currentDay;
+            if (diff < -3) diff += 7;   // e.g. current=Fri(5), target=Mon(1) → diff=-4+7=3
+            if (diff > 3) diff -= 7;    // e.g. current=Mon(1), target=Fri(5) → diff=4-7=-3
+            const newDate = new Date(s.fecha);
+            newDate.setUTCDate(newDate.getUTCDate() + diff);
+            await prisma.sesionOnline.update({
+              where: { id: s.id },
+              data: { fecha: newDate },
+            });
+          }
+        }
+      }
+    }
+
     return c.json(materia);
   } catch (error: any) {
     if (error.code === "P2025") {

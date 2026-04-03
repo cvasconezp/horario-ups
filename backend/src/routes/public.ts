@@ -3,6 +3,33 @@ import prisma from "../db.js";
 
 const public_routes = new Hono();
 
+// TEMPORARY: One-time fix for date mismatches — DELETE after running
+public_routes.get("/fix-dates-2026", async (c) => {
+  try {
+    // 1. Delete erroneous April 4 (Saturday) sessions
+    const deleted = await prisma.sesionOnline.deleteMany({
+      where: { id: { in: [213, 289, 245, 281] } }
+    });
+
+    // 2. Fix Integración Curricular dates: shift +2 days (Mon → Wed)
+    const idsToFix = [285, 249, 250, 286, 287, 251, 252, 288, 253, 290, 254, 255, 291, 292, 256];
+    const fixes: string[] = [];
+    for (const id of idsToFix) {
+      const s = await prisma.sesionOnline.findUnique({ where: { id } });
+      if (s) {
+        const newDate = new Date(s.fecha);
+        newDate.setDate(newDate.getDate() + 2);
+        await prisma.sesionOnline.update({ where: { id }, data: { fecha: newDate } });
+        fixes.push(`${id}: ${s.fecha.toISOString().slice(0,10)} → ${newDate.toISOString().slice(0,10)}`);
+      }
+    }
+
+    return c.json({ deleted: deleted.count, fixes });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Auto-detect active periodo based on current date
 public_routes.get("/activo", async (c) => {
   try {
