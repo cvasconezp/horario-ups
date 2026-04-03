@@ -403,6 +403,228 @@ public_routes.get("/docente/:docenteId/horario/:periodoId", async (c) => {
 });
 
 // ============================================================
+// Docente search (public, but accessed after docente login)
+// ============================================================
+public_routes.get("/docentes/buscar", async (c) => {
+  try {
+    const q = c.req.query("q") || "";
+    if (q.length < 2) {
+      return c.json([]);
+    }
+
+    const docentes = await prisma.docente.findMany({
+      where: {
+        nombre: { contains: q, mode: "insensitive" },
+      },
+      orderBy: { nombre: "asc" },
+      take: 15,
+    });
+
+    return c.json(docentes.map((d: any) => ({ id: d.id, nombre: d.nombre })));
+  } catch (error) {
+    return c.json({ error: "Failed to search docentes" }, 500);
+  }
+});
+
+// ============================================================
+// Docente schedule (public endpoint, accessed after docente login)
+// ============================================================
+public_routes.get("/docentes/:docenteId/horario", async (c) => {
+  try {
+    const { docenteId } = c.req.param();
+    const periodoId = c.req.query("periodoId");
+    const dId = parseInt(docenteId);
+
+    if (!periodoId) {
+      return c.json({ error: "periodoId is required" }, 400);
+    }
+    const pId = parseInt(periodoId);
+
+    const docente = await prisma.docente.findUnique({ where: { id: dId } });
+    if (!docente) {
+      return c.json({ error: "Docente not found" }, 404);
+    }
+
+    const [asignaciones, presenciales, eventos] = await Promise.all([
+      prisma.asignacion.findMany({
+        where: {
+          docenteId: dId,
+          materia: { periodoId: pId },
+        },
+        include: {
+          materia: {
+            include: { nivel: true },
+          },
+          centro: true,
+          docente: true,
+        },
+        orderBy: [
+          { centro: { nombre: "asc" } },
+          { materia: { nombre: "asc" } },
+        ],
+      }),
+      prisma.sesionPresencial.findMany({
+        where: {
+          docenteId: dId,
+          materia: { periodoId: pId },
+        },
+        include: {
+          materia: { include: { nivel: true } },
+          centro: true,
+        },
+        orderBy: { fecha: "asc" },
+      }),
+      prisma.calendarioEvento.findMany({
+        where: { periodoId: pId },
+        orderBy: { fecha: "asc" },
+      }),
+    ]);
+
+    // Get online sessions for materias this docente teaches
+    const materiaIds = [...new Set(asignaciones.map((a: any) => a.materiaId))];
+    const sesionesOnline = await prisma.sesionOnline.findMany({
+      where: {
+        materiaId: { in: materiaIds },
+      },
+      include: { materia: true },
+      orderBy: { fecha: "asc" },
+    });
+
+    return c.json({
+      docente: { id: docente.id, nombre: docente.nombre },
+      asignaciones,
+      presenciales,
+      sesionesOnline,
+      eventos,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to fetch docente schedule" }, 500);
+  }
+});
+
+// ============================================================
+// iCal for docente
+// ============================================================
+public_routes.get("/ical/docente/:docenteId/:periodoId", async (c) => {
+  try {
+    const { docenteId, periodoId } = c.req.param();
+    const dId = parseInt(docenteId);
+    const pId = parseInt(periodoId);
+
+    const [docente, periodo] = await Promise.all([
+      prisma.docente.findUnique({ where: { id: dId } }),
+      prisma.periodo.findUnique({ where: { id: pId } }),
+    ]);
+
+    if (!docente || !periodo) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    // Get all asignaciones for this docente
+    const asignaciones = await prisma.asignacion.findMany({
+      where: { docenteId: dId, materia: { periodoId: pId } },
+      include: { materia: true, centro: true },
+    });
+    const materiaIds = [...new Set(asignaciones.map((a: any) => a.materiaId))];
+
+    const [sesionesOnline, presenciales] = await Promise.all([
+      prisma.sesionOnline.findMany({
+        where: { materiaId: { in: materiaIds } },
+        include: { materia: true },
+        orderBy: { fecha: "asc" },
+      }),
+      prisma.sesionPresencial.findMany({
+        where: { docenteId: dId, materia: { periodoId: pId } },
+        include: { materia: true, centro: true },
+        orderBy: { fecha: "asc" },
+      }),
+    ]);
+
+    const calName = `Horario Prof. ${docente.nombre} - ${periodo.label}`;
+    const now = formatICalDate(new Date());
+
+    let ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//PachaTech//Horario EIB//ES",
+      `X-WR-CALNAME:${calName}`,
+      "X-WR-TIMEZONE:America/Guayaquil",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VTIMEZONE",
+      "TZID:America/Guayaquil",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      "TZOFFSETFROM:-0500",
+      "TZOFFSETTO:-0500",
+      "TZNAME:ECT",
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    ];
+
+    // Build centro map for online sessions
+    const materiaCentroMap = new Map<number, string[]>();
+    asignaciones.forEach((a: any) => {
+      if (!materiaCentroMap.has(a.materiaId)) materiaCentroMap.set(a.materiaId, []);
+      materiaCentroMap.get(a.materiaId)!.push(a.centro.nombre);
+    });
+
+    for (const s of sesionesOnline) {
+      const dtStart = formatICalDateTime(s.fecha, s.hora);
+      const dtEnd = formatICalDateTimeAdd90(s.fecha, s.hora);
+      const centros = materiaCentroMap.get(s.materiaId)?.join(", ") || "";
+      const summary = `${s.materia.nombreCorto} - ${s.tipo === "tutoria" ? "Tutoría" : "Clase"} Online`;
+      const description = `Materia: ${s.materia.nombre}\\nUnidad: ${s.unidad}${centros ? "\\nCentros: " + centros : ""}`;
+
+      ics.push(
+        "BEGIN:VEVENT",
+        `UID:docente-online-${s.id}@horario-ups`,
+        `DTSTAMP:${now}`,
+        `DTSTART;TZID=America/Guayaquil:${dtStart}`,
+        `DTEND;TZID=America/Guayaquil:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        "END:VEVENT"
+      );
+    }
+
+    for (const s of presenciales) {
+      const dtStart = formatICalDateTime(s.fecha, s.horaInicio);
+      const dtEnd = formatICalDateTime(s.fecha, s.horaFin);
+      const tipoLabel = s.tipo === "examen" ? "Examen" : s.tipo === "tutoria" ? "Tutoría Presencial" : "Clase Presencial";
+      const summary = `${s.materia.nombreCorto} - ${tipoLabel}`;
+      const description = `Materia: ${s.materia.nombre}\\nBimestre: ${s.bimestre}`;
+
+      ics.push(
+        "BEGIN:VEVENT",
+        `UID:docente-presencial-${s.id}@horario-ups`,
+        `DTSTAMP:${now}`,
+        `DTSTART;TZID=America/Guayaquil:${dtStart}`,
+        `DTEND;TZID=America/Guayaquil:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        `LOCATION:${(s as any).centro?.nombre || ""}`,
+        "END:VEVENT"
+      );
+    }
+
+    ics.push("END:VCALENDAR");
+    const body = ics.filter((line) => line !== "").join("\r\n");
+
+    return new Response(body, {
+      headers: {
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Content-Disposition": `attachment; filename="horario-docente-${docenteId}.ics"`,
+        "Cache-Control": "no-cache",
+      },
+    });
+  } catch (error) {
+    console.error("[iCal Docente Error]", error);
+    return c.json({ error: "Failed to generate calendar" }, 500);
+  }
+});
+
+// ============================================================
 // iCal endpoint for calendar subscription
 // ============================================================
 public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
