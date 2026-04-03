@@ -7,7 +7,8 @@ import { WeeklySchedule } from '../components/schedule/WeeklySchedule';
 import { OnlineSessions } from '../components/schedule/OnlineSessions';
 import { PresencialSessions } from '../components/schedule/PresencialSessions';
 import { AcademicCalendar } from '../components/schedule/AcademicCalendar';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Calendar } from 'lucide-react';
+import { NotificationBanner } from '../components/NotificationBanner';
 
 export const ScheduleView: React.FC = () => {
   const { periodoId, nivelId, centroId } = useParams<{
@@ -25,7 +26,7 @@ export const ScheduleView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<
     'semanal' | 'online' | 'presenciales' | 'calendario'
-  >('semanal');
+  >('online');
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,18 +89,27 @@ export const ScheduleView: React.FC = () => {
   }
 
   const tabs = [
+    { id: 'online', label: 'Clases en Línea', count: sesionesOnline.length },
+    { id: 'presenciales', label: 'Presenciales', count: sesionesPresenciales.length },
+    { id: 'calendario', label: 'Fechas', count: eventos.length },
     { id: 'semanal', label: 'Horario Semanal', count: horario.materias.length },
-    { id: 'online', label: 'Sesiones Online', count: sesionesOnline.length },
-    { id: 'presenciales', label: 'Sesiones Presenciales', count: sesionesPresenciales.length },
-    { id: 'calendario', label: 'Calendario', count: eventos.length },
   ] as const;
 
-  const apiUrl = import.meta.env.VITE_API_URL;
-  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${apiUrl}/ical/${periodoId}/${nivelId}/${centroId}`;
-  const appleOutlookUrl = `webcal://${apiUrl.replace('http://', '').replace('https://', '')}/ical/${periodoId}/${nivelId}/${centroId}`;
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const icalPath = `/ical/${periodoId}/${nivelId}/${centroId}`;
+  // Google Calendar needs webcal:// URL in the cid parameter
+  const baseHost = apiUrl.replace('https://', '').replace('http://', '');
+  const webcalUrl = `webcal://${baseHost}${icalPath}`;
+  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(webcalUrl)}`;
 
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Notification Banner */}
+      <NotificationBanner
+        sesionesOnline={sesionesOnline}
+        sesionesPresenciales={sesionesPresenciales}
+      />
+
       {/* Header */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <div className="mb-4">
@@ -124,23 +134,22 @@ export const ScheduleView: React.FC = () => {
 
         {/* Calendar Subscription Buttons */}
         <div className="border-t pt-4 mt-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Suscribirse al horario:</p>
           <div className="flex flex-wrap gap-3">
             <a
               href={googleCalendarUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white font-semibold text-sm rounded-lg hover:bg-green-700 transition-colors"
             >
-              📅 Google Calendar
+              <Calendar size={16} />
+              Suscribirse en Google Calendar
             </a>
             <a
-              href={appleOutlookUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              href={webcalUrl}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 transition-colors"
             >
-              📅 Apple/Outlook
+              <Calendar size={16} />
+              Suscribirse (Apple/Outlook)
             </a>
           </div>
         </div>
