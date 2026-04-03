@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
-import prisma from "./db";
-import { authMiddleware, requireRole } from "./middleware/auth";
-import public_routes from "./routes/public";
-import auth_routes from "./routes/auth";
-import admin_routes from "./routes/admin";
-import docente_routes from "./routes/docente";
+import prisma from "./db.js";
+import { authMiddleware, requireRole } from "./middleware/auth.js";
+import public_routes from "./routes/public.js";
+import auth_routes from "./routes/auth.js";
+import admin_routes from "./routes/admin.js";
+import docente_routes from "./routes/docente.js";
 
 const app = new Hono();
 const PORT = parseInt(process.env.PORT || "3001");

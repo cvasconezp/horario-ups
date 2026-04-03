@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import * as bcrypt from "bcryptjs";
-import prisma from "../db";
-import { generateToken, JWTPayload } from "../middleware/auth";
+import prisma from "../db.js";
+import { generateToken, JWTPayload } from "../middleware/auth.js";
 
 const auth_routes = new Hono();
 

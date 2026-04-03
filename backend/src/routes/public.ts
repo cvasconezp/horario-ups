@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import prisma from "../db";
+import prisma from "../db.js";
 
 const public_routes = new Hono();
 

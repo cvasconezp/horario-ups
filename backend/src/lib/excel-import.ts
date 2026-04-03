@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import prisma from "../db";
+import prisma from "../db.js";
 
 export interface CarreraRow {
   nombre: string;

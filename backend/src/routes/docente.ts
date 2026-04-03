@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import prisma from "../db";
-import { generateICalendar, CalendarSession } from "../lib/ical";
-import { JWTPayload } from "../middleware/auth";
+import prisma from "../db.js";
+import { generateICalendar, CalendarSession } from "../lib/ical.js";
+import { JWTPayload } from "../middleware/auth.js";
 
 const docente_routes = new Hono();
 

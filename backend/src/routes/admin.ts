@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import * as bcrypt from "bcryptjs";
-import prisma from "../db";
+import prisma from "../db.js";
 import {
   parseExcelFile,
   importCarreras,
@@ -9,7 +9,7 @@ import {
   importCentros,
   importDocentes,
   importMaterias,
-} from "../lib/excel-import";
+} from "../lib/excel-import.js";
 
 const admin_routes = new Hono();
 
