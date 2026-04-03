@@ -643,6 +643,103 @@ admin_routes.put("/materias/:id", async (c) => {
   }
 });
 
+// Quick partial update for materia (dia, hora — applies to ALL sessions)
+admin_routes.patch("/materias/:id", async (c) => {
+  try {
+    const body = await c.req.json();
+    const data: Record<string, any> = {};
+    if (body.dia !== undefined) data.dia = body.dia;
+    if (body.hora !== undefined) data.hora = body.hora;
+    if (body.duracion !== undefined) data.duracion = body.duracion;
+
+    const materia = await prisma.materia.update({
+      where: { id: parseInt(c.req.param("id")) },
+      data,
+      include: { nivel: true },
+    });
+
+    // Also update hora on ALL future SesionOnline for this materia if hora changed
+    if (body.hora !== undefined) {
+      const now = new Date();
+      await prisma.sesionOnline.updateMany({
+        where: {
+          materiaId: parseInt(c.req.param("id")),
+          fecha: { gte: now },
+        },
+        data: { hora: body.hora },
+      });
+    }
+
+    return c.json(materia);
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return c.json({ error: "Materia not found" }, 404);
+    }
+    return c.json({ error: "Failed to update materia" }, 500);
+  }
+});
+
+// Update a single SesionOnline (applies to ONE session only)
+admin_routes.patch("/sesiones-online/:id", async (c) => {
+  try {
+    const body = await c.req.json();
+    const data: Record<string, any> = {};
+    if (body.fecha !== undefined) data.fecha = new Date(body.fecha);
+    if (body.hora !== undefined) data.hora = body.hora;
+
+    const sesion = await prisma.sesionOnline.update({
+      where: { id: parseInt(c.req.param("id")) },
+      data,
+      include: { materia: true },
+    });
+    return c.json(sesion);
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return c.json({ error: "SesionOnline not found" }, 404);
+    }
+    return c.json({ error: "Failed to update sesion" }, 500);
+  }
+});
+
+// Get upcoming sessions for a materia (for the "edit which session" picker)
+admin_routes.get("/materias/:id/sesiones-upcoming", async (c) => {
+  try {
+    const now = new Date();
+    const sesiones = await prisma.sesionOnline.findMany({
+      where: {
+        materiaId: parseInt(c.req.param("id")),
+        fecha: { gte: now },
+      },
+      orderBy: { fecha: "asc" },
+      take: 10,
+    });
+    return c.json(sesiones);
+  } catch (error) {
+    return c.json({ error: "Failed to fetch upcoming sessions" }, 500);
+  }
+});
+
+// Quick partial update for asignacion enlace virtual
+admin_routes.patch("/asignaciones/:id", async (c) => {
+  try {
+    const body = await c.req.json();
+    const data: Record<string, any> = {};
+    if (body.enlaceVirtual !== undefined) data.enlaceVirtual = body.enlaceVirtual;
+
+    const asignacion = await prisma.asignacion.update({
+      where: { id: parseInt(c.req.param("id")) },
+      data,
+      include: { materia: { include: { nivel: true } }, docente: true, centro: true },
+    });
+    return c.json(asignacion);
+  } catch (error: any) {
+    if (error.code === "P2025") {
+      return c.json({ error: "Asignacion not found" }, 404);
+    }
+    return c.json({ error: "Failed to update asignacion" }, 500);
+  }
+});
+
 admin_routes.delete("/materias/:id", async (c) => {
   try {
     await prisma.materia.delete({

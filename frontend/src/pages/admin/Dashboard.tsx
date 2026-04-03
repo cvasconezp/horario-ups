@@ -7,7 +7,8 @@ import {
   Check,
   AlertTriangle,
   ExternalLink,
-  Filter,
+  Pencil,
+  X,
 } from 'lucide-react';
 
 interface AsignacionFull {
@@ -48,15 +49,20 @@ interface AsignacionFull {
   };
 }
 
+interface UpcomingSesion {
+  id: number;
+  materiaId: number;
+  fecha: string;
+  hora: string;
+  tipo: string;
+  unidad: number;
+}
+
+const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
 const getBloqueLabel = (asig: AsignacionFull): string => {
-  // Use zona to determine which bimestre field
   const zona = asig.centro.zona;
-  let bim: number;
-  if (zona === 'RL') {
-    bim = asig.materia.bimestreRL;
-  } else {
-    bim = asig.materia.bimestreOC;
-  }
+  const bim = zona === 'RL' ? asig.materia.bimestreRL : asig.materia.bimestreOC;
   if (bim === 1) return '1ER BLOQUE';
   if (bim === 2) return '2DO BLOQUE';
   return 'SEMESTRAL';
@@ -69,14 +75,18 @@ const getBloqueColor = (label: string): string => {
 };
 
 const buildWhatsAppMsg = (asig: AsignacionFull): string => {
-  const parts = [
-    `*${asig.materia.nombre}*`,
-    `con ${asig.docente.nombre}`,
-  ];
+  const parts = [`*${asig.materia.nombre}*`, `con ${asig.docente.nombre}`];
   if (asig.materia.dia) parts.push(asig.materia.dia);
   if (asig.materia.hora) parts.push(`| ${asig.materia.hora}`);
   if (asig.enlaceVirtual) parts.push(asig.enlaceVirtual);
   return parts.join(' ');
+};
+
+const formatSessionDate = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  const day = d.getUTCDate();
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${day} ${months[d.getUTCMonth()]}`;
 };
 
 export const AdminDashboard: React.FC = () => {
@@ -94,6 +104,16 @@ export const AdminDashboard: React.FC = () => {
   // Copy state
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+
+  // Edit modal state
+  const [editingAsig, setEditingAsig] = useState<AsignacionFull | null>(null);
+  const [editDia, setEditDia] = useState('');
+  const [editHora, setEditHora] = useState('');
+  const [editStep, setEditStep] = useState<'form' | 'choose'>('form');
+  const [upcomingSesiones, setUpcomingSesiones] = useState<UpcomingSesion[]>([]);
+  const [selectedSesionId, setSelectedSesionId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
 
   // Conflicts
   const [conflicts, setConflicts] = useState<any>(null);
@@ -118,9 +138,7 @@ export const AdminDashboard: React.FC = () => {
   // Derive unique filter options
   const niveles = useMemo(() => {
     const set = new Map<number, string>();
-    asignaciones.forEach((a) => {
-      set.set(a.materia.nivel.numero, `${a.materia.nivel.numero}°`);
-    });
+    asignaciones.forEach((a) => set.set(a.materia.nivel.numero, `${a.materia.nivel.numero}°`));
     return Array.from(set.entries()).sort((a, b) => a[0] - b[0]);
   }, [asignaciones]);
 
@@ -133,16 +151,13 @@ export const AdminDashboard: React.FC = () => {
   const dias = useMemo(() => {
     const order = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     const set = new Set<string>();
-    asignaciones.forEach((a) => {
-      if (a.materia.dia) set.add(a.materia.dia);
-    });
+    asignaciones.forEach((a) => { if (a.materia.dia) set.add(a.materia.dia); });
     return order.filter((d) => set.has(d));
   }, [asignaciones]);
 
   // Apply filters
   const filtered = useMemo(() => {
     return asignaciones.filter((a) => {
-      // Search text
       if (searchText) {
         const q = searchText.toLowerCase();
         const matches =
@@ -152,39 +167,22 @@ export const AdminDashboard: React.FC = () => {
           a.centro.nombre.toLowerCase().includes(q);
         if (!matches) return false;
       }
-
-      // Nivel
       if (filterNivel && a.materia.nivel.numero !== parseInt(filterNivel)) return false;
-
-      // Centro
       if (filterCentro && a.centro.id !== parseInt(filterCentro)) return false;
-
-      // Bloque
-      if (filterBloque) {
-        const bloque = getBloqueLabel(a);
-        if (bloque !== filterBloque) return false;
-      }
-
-      // Día
-      if (filterDia) {
-        if (a.materia.dia !== filterDia) return false;
-      }
-
+      if (filterBloque && getBloqueLabel(a) !== filterBloque) return false;
+      if (filterDia && a.materia.dia !== filterDia) return false;
       return true;
     });
   }, [asignaciones, searchText, filterNivel, filterCentro, filterBloque, filterDia]);
 
   const handleCopyOne = async (asig: AsignacionFull) => {
-    const msg = buildWhatsAppMsg(asig);
-    await navigator.clipboard.writeText(msg);
+    await navigator.clipboard.writeText(buildWhatsAppMsg(asig));
     setCopiedId(asig.id);
     setTimeout(() => setCopiedId(null), 1500);
   };
 
   const handleCopyAll = async () => {
-    const text = filtered
-      .map((a) => buildWhatsAppMsg(a))
-      .join('\n\n─────\n\n');
+    const text = filtered.map((a) => buildWhatsAppMsg(a)).join('\n\n─────\n\n');
     await navigator.clipboard.writeText(text);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
@@ -196,23 +194,95 @@ export const AdminDashboard: React.FC = () => {
       const response = await client.get('/admin/conflicts');
       setConflicts(response.data);
     } catch (err) {
-      console.error('Error detecting conflicts:', err);
+      console.error(err);
     } finally {
       setConflictsLoading(false);
+    }
+  };
+
+  // === EDIT MODAL LOGIC ===
+  const openEditModal = async (asig: AsignacionFull) => {
+    setEditingAsig(asig);
+    setEditDia(asig.materia.dia || '');
+    setEditHora(asig.materia.hora || '');
+    setEditStep('form');
+    setSaveMsg('');
+    setSelectedSesionId(null);
+
+    // Fetch upcoming sessions for this materia
+    try {
+      const res = await client.get<UpcomingSesion[]>(`/admin/materias/${asig.materia.id}/sesiones-upcoming`);
+      setUpcomingSesiones(res.data);
+    } catch {
+      setUpcomingSesiones([]);
+    }
+  };
+
+  const closeEditModal = () => {
+    setEditingAsig(null);
+    setEditStep('form');
+    setSaveMsg('');
+  };
+
+  const handleEditNext = () => {
+    setEditStep('choose');
+  };
+
+  const handleSaveAll = async () => {
+    if (!editingAsig) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      await client.patch(`/admin/materias/${editingAsig.materia.id}`, {
+        dia: editDia || null,
+        hora: editHora || null,
+      });
+
+      // Update local state
+      setAsignaciones((prev) =>
+        prev.map((a) =>
+          a.materia.id === editingAsig.materia.id
+            ? { ...a, materia: { ...a.materia, dia: editDia || null, hora: editHora || null } }
+            : a
+        )
+      );
+      setSaveMsg('Todos los eventos actualizados');
+      setTimeout(closeEditModal, 1200);
+    } catch (err) {
+      setSaveMsg('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveSingle = async () => {
+    if (!selectedSesionId) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      await client.patch(`/admin/sesiones-online/${selectedSesionId}`, {
+        hora: editHora || null,
+      });
+      setSaveMsg('Sesión individual actualizada');
+      setTimeout(closeEditModal, 1200);
+    } catch (err) {
+      setSaveMsg('Error al guardar');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <AdminLayout pageTitle="Panel de Administración">
       <div className="space-y-6">
-        {/* Header bar */}
+        {/* Header */}
         <div className="bg-gradient-header text-white rounded-lg p-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Panel de Administración</h2>
             <p className="text-sm opacity-80">EIB en Línea</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2 text-sm font-semibold">
-            📋 {filtered.length}/{asignaciones.length}
+            {filtered.length}/{asignaciones.length}
           </div>
         </div>
 
@@ -229,55 +299,30 @@ export const AdminDashboard: React.FC = () => {
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-
-            <select
-              value={filterNivel}
-              onChange={(e) => setFilterNivel(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-            >
+            <select value={filterNivel} onChange={(e) => setFilterNivel(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
               <option value="">Todos los niveles</option>
-              {niveles.map(([num, label]) => (
-                <option key={num} value={num}>{label}</option>
-              ))}
+              {niveles.map(([num, label]) => <option key={num} value={num}>{label}</option>)}
             </select>
-
-            <select
-              value={filterCentro}
-              onChange={(e) => setFilterCentro(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-            >
+            <select value={filterCentro} onChange={(e) => setFilterCentro(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
               <option value="">Todos los centros</option>
-              {centros.map(([id, nombre]) => (
-                <option key={id} value={id}>{nombre}</option>
-              ))}
+              {centros.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
             </select>
-
-            <select
-              value={filterBloque}
-              onChange={(e) => setFilterBloque(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-            >
+            <select value={filterBloque} onChange={(e) => setFilterBloque(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
               <option value="">Todos los bloques</option>
               <option value="1ER BLOQUE">1er Bloque</option>
               <option value="2DO BLOQUE">2do Bloque</option>
               <option value="SEMESTRAL">Semestral</option>
             </select>
-
-            <select
-              value={filterDia}
-              onChange={(e) => setFilterDia(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-            >
+            <select value={filterDia} onChange={(e) => setFilterDia(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
               <option value="">Todos los días</option>
-              {dias.map((dia) => (
-                <option key={dia} value={dia}>{dia}</option>
-              ))}
+              {dias.map((dia) => <option key={dia} value={dia}>{dia}</option>)}
             </select>
-
-            <button
-              onClick={handleCopyAll}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium whitespace-nowrap"
-            >
+            <button onClick={handleCopyAll}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium whitespace-nowrap">
               {copiedAll ? <Check size={16} /> : <Copy size={16} />}
               {copiedAll ? 'Copiado!' : 'Copiar filtrados'}
             </button>
@@ -303,106 +348,79 @@ export const AdminDashboard: React.FC = () => {
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">Día</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">Hora</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">Enlace</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-600">Copiar</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-600">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((asig, idx) => {
                     const bloqueLabel = getBloqueLabel(asig);
                     const bloqueColor = getBloqueColor(bloqueLabel);
-                    const is2doBimestre = bloqueLabel === '2DO BLOQUE';
+                    const is2do = bloqueLabel === '2DO BLOQUE';
 
                     return (
-                      <tr
-                        key={asig.id}
-                        className={`border-b border-gray-100 hover:bg-blue-50/50 transition ${
-                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                        }`}
-                      >
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          {asig.materia.nivel.numero}°
-                        </td>
+                      <tr key={asig.id}
+                        className={`border-b border-gray-100 hover:bg-blue-50/50 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{asig.materia.nivel.numero}°</td>
                         <td className="px-4 py-3 text-gray-700">{asig.centro.nombre}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded ${bloqueColor}`}>
-                            {bloqueLabel}
-                          </span>
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded ${bloqueColor}`}>{bloqueLabel}</span>
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          {asig.materia.nombre}
-                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{asig.materia.nombre}</td>
                         <td className="px-4 py-3 text-gray-700">{asig.docente.nombre}</td>
                         <td className="px-4 py-3 text-gray-700">
-                          {is2doBimestre && !asig.materia.dia ? (
-                            <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
-                          ) : (
-                            asig.materia.dia || '—'
-                          )}
+                          {is2do && !asig.materia.dia
+                            ? <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
+                            : asig.materia.dia || '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-700">
-                          {is2doBimestre && !asig.materia.hora ? (
-                            <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
-                          ) : (
-                            asig.materia.hora || '—'
-                          )}
+                          {is2do && !asig.materia.hora
+                            ? <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
+                            : asig.materia.hora || '—'}
                         </td>
                         <td className="px-4 py-3">
                           {asig.enlaceVirtual ? (
-                            <a
-                              href={asig.enlaceVirtual}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800"
-                              title={asig.enlaceVirtual}
-                            >
+                            <a href={asig.enlaceVirtual} target="_blank" rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800" title={asig.enlaceVirtual}>
                               <ExternalLink size={16} />
                             </a>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
+                          ) : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleCopyOne(asig)}
-                            className="p-1.5 rounded hover:bg-gray-100 transition text-gray-500 hover:text-green-600"
-                            title="Copiar mensaje WhatsApp"
-                          >
-                            {copiedId === asig.id ? (
-                              <Check size={16} className="text-green-600" />
-                            ) : (
-                              <Copy size={16} />
-                            )}
-                          </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => openEditModal(asig)}
+                              className="p-1.5 rounded hover:bg-blue-100 transition text-gray-500 hover:text-blue-600"
+                              title="Editar día/hora">
+                              <Pencil size={16} />
+                            </button>
+                            <button onClick={() => handleCopyOne(asig)}
+                              className="p-1.5 rounded hover:bg-gray-100 transition text-gray-500 hover:text-green-600"
+                              title="Copiar WhatsApp">
+                              {copiedId === asig.id ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-
               {filtered.length === 0 && !isLoading && (
-                <div className="p-8 text-center text-gray-500">
-                  No se encontraron asignaciones con los filtros actuales
-                </div>
+                <div className="p-8 text-center text-gray-500">No se encontraron asignaciones con los filtros actuales</div>
               )}
             </div>
           )}
         </div>
 
-        {/* Conflict Detection Section */}
+        {/* Conflict Detection */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <AlertTriangle size={20} />
             Detección de Cruces de Horario
           </h3>
-          <button
-            onClick={handleDetectConflicts}
-            disabled={conflictsLoading}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition disabled:opacity-50"
-          >
+          <button onClick={handleDetectConflicts} disabled={conflictsLoading}
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition disabled:opacity-50">
             {conflictsLoading ? 'Analizando...' : 'Detectar Cruces'}
           </button>
-
           {conflicts && (
             <div className="mt-4">
               {conflicts.conflictCount === 0 ? (
@@ -414,24 +432,22 @@ export const AdminDashboard: React.FC = () => {
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 font-medium">
                     Se detectaron {conflicts.conflictCount} cruces
                   </div>
-                  {conflicts.conflicts.map((conflict: any, idx: number) => (
+                  {conflicts.conflicts.map((c: any, idx: number) => (
                     <div key={idx} className="border border-gray-200 rounded-lg p-4">
                       <p className="font-semibold text-gray-900 mb-2">
-                        {conflict.docenteNombre}
+                        {c.docenteNombre}
                         <span className="ml-2 text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
-                          {conflict.type === 'asignacion' ? 'Asignación' : 'Presencial'}
+                          {c.type === 'asignacion' ? 'Asignación' : 'Presencial'}
                         </span>
                       </p>
                       <div className="space-y-1">
-                        {conflict.conflicts.map((item: any, iIdx: number) => (
-                          <div key={iIdx} className="text-sm bg-gray-50 p-2 rounded">
+                        {c.conflicts.map((item: any, i: number) => (
+                          <div key={i} className="text-sm bg-gray-50 p-2 rounded">
                             <span className="font-medium">{item.materiaNombre}</span>
                             <span className="text-gray-500 ml-2">— {item.centroNombre}</span>
                             {item.dia && <span className="text-gray-500 ml-2">{item.dia} {item.hora}</span>}
                             {item.fechaPresencial && (
-                              <span className="text-gray-500 ml-2">
-                                {item.fechaPresencial} {item.horaInicio}-{item.horaFin}
-                              </span>
+                              <span className="text-gray-500 ml-2">{item.fechaPresencial} {item.horaInicio}-{item.horaFin}</span>
                             )}
                           </div>
                         ))}
@@ -444,6 +460,128 @@ export const AdminDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ===== EDIT MODAL ===== */}
+      {editingAsig && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-5 border-b">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Editar Horario</h3>
+                <p className="text-sm text-gray-500">{editingAsig.materia.nombre}</p>
+              </div>
+              <button onClick={closeEditModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Step 1: Edit form */}
+            {editStep === 'form' && (
+              <div className="p-5 space-y-4">
+                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                  <p><span className="font-medium">Docente:</span> {editingAsig.docente.nombre}</p>
+                  <p><span className="font-medium">Centro:</span> {editingAsig.centro.nombre}</p>
+                  <p><span className="font-medium">Actual:</span> {editingAsig.materia.dia || '—'} | {editingAsig.materia.hora || '—'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Día</label>
+                  <select value={editDia} onChange={(e) => setEditDia(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Sin día</option>
+                    {DIAS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                  <input type="time" value={editHora} onChange={(e) => setEditHora(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+
+                <button onClick={handleEditNext}
+                  className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                  Continuar
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Choose scope */}
+            {editStep === 'choose' && (
+              <div className="p-5 space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                  <p className="font-medium">Nuevo horario:</p>
+                  <p>{editDia || '(sin día)'} | {editHora || '(sin hora)'}</p>
+                </div>
+
+                <p className="text-sm font-medium text-gray-700">¿Aplicar cambio a:</p>
+
+                {/* Option 1: All events */}
+                <button onClick={handleSaveAll} disabled={saving}
+                  className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition disabled:opacity-50">
+                  <p className="font-bold text-gray-900">Todos los eventos</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Cambia el horario base de la materia y actualiza TODAS las sesiones online futuras.
+                    Se refleja en la app web y en las suscripciones de calendario.
+                  </p>
+                </button>
+
+                {/* Option 2: Single event */}
+                <div className="border-2 border-gray-200 rounded-lg p-4">
+                  <p className="font-bold text-gray-900 mb-2">Solo un evento específico</p>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Cambia la hora de UNA sola sesión. El horario base no se modifica.
+                  </p>
+
+                  {upcomingSesiones.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">No hay sesiones futuras para esta materia</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {upcomingSesiones.map((s) => (
+                        <label key={s.id}
+                          className={`flex items-center gap-3 p-2 rounded cursor-pointer text-sm transition ${
+                            selectedSesionId === s.id ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-50 border border-transparent'
+                          }`}>
+                          <input type="radio" name="sesion" value={s.id}
+                            checked={selectedSesionId === s.id}
+                            onChange={() => setSelectedSesionId(s.id)}
+                            className="text-blue-600" />
+                          <span className="font-medium">{formatSessionDate(s.fecha)}</span>
+                          <span className="text-gray-500">{s.hora}</span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                            {s.tipo === 'tutoria' ? 'Tutoría' : 'Clase'} U.{s.unidad}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <button onClick={handleSaveSingle}
+                    disabled={saving || !selectedSesionId}
+                    className="mt-3 w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    Aplicar solo a este evento
+                  </button>
+                </div>
+
+                {/* Feedback */}
+                {saveMsg && (
+                  <div className={`p-3 rounded-lg text-sm font-medium text-center ${
+                    saveMsg.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                  }`}>
+                    {saveMsg}
+                  </div>
+                )}
+
+                <button onClick={() => setEditStep('form')}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition">
+                  Volver
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };
