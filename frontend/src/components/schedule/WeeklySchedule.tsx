@@ -104,10 +104,16 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
   eventos = [],
   centroId,
 }) => {
-  // Group materias by day
+  // Filter out 2do bimestre materias (not yet confirmed) and group by day
+  const filteredMaterias = materias.filter((m) => {
+    const bim = getZonaBimestre(centroId, m);
+    // Hide 2do bimestre materias — schedule not confirmed yet
+    return bim !== 2;
+  });
+
   const materiasByDay: Record<string, typeof materias> = {};
   daysOfWeek.forEach((day) => {
-    materiasByDay[day] = materias.filter((m) => m.dia === day);
+    materiasByDay[day] = filteredMaterias.filter((m) => m.dia === day);
   });
 
   // Get upcoming presencial sessions (next 5, sorted by date)

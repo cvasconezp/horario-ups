@@ -109,6 +109,7 @@ export const AdminDashboard: React.FC = () => {
   const [editingAsig, setEditingAsig] = useState<AsignacionFull | null>(null);
   const [editDia, setEditDia] = useState('');
   const [editHora, setEditHora] = useState('');
+  const [editFecha, setEditFecha] = useState(''); // for single session date override
   const [editStep, setEditStep] = useState<'form' | 'choose'>('form');
   const [upcomingSesiones, setUpcomingSesiones] = useState<UpcomingSesion[]>([]);
   const [selectedSesionId, setSelectedSesionId] = useState<number | null>(null);
@@ -205,6 +206,7 @@ export const AdminDashboard: React.FC = () => {
     setEditingAsig(asig);
     setEditDia(asig.materia.dia || '');
     setEditHora(asig.materia.hora || '');
+    setEditFecha('');
     setEditStep('form');
     setSaveMsg('');
     setSelectedSesionId(null);
@@ -260,9 +262,11 @@ export const AdminDashboard: React.FC = () => {
     setSaving(true);
     setSaveMsg('');
     try {
-      await client.patch(`/admin/sesiones-online/${selectedSesionId}`, {
-        hora: editHora || null,
-      });
+      const patchData: Record<string, any> = {};
+      if (editHora) patchData.hora = editHora;
+      if (editFecha) patchData.fecha = editFecha;
+
+      await client.patch(`/admin/sesiones-online/${selectedSesionId}`, patchData);
       setSaveMsg('Sesión individual actualizada');
       setTimeout(closeEditModal, 1200);
     } catch (err) {
@@ -531,30 +535,49 @@ export const AdminDashboard: React.FC = () => {
                 <div className="border-2 border-gray-200 rounded-lg p-4">
                   <p className="font-bold text-gray-900 mb-2">Solo un evento específico</p>
                   <p className="text-sm text-gray-600 mb-3">
-                    Cambia la hora de UNA sola sesión. El horario base no se modifica.
+                    Cambia la fecha y/o hora de UNA sola sesión. El horario base no se modifica.
                   </p>
 
                   {upcomingSesiones.length === 0 ? (
                     <p className="text-sm text-gray-400 italic">No hay sesiones futuras para esta materia</p>
                   ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {upcomingSesiones.map((s) => (
-                        <label key={s.id}
-                          className={`flex items-center gap-3 p-2 rounded cursor-pointer text-sm transition ${
-                            selectedSesionId === s.id ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-50 border border-transparent'
-                          }`}>
-                          <input type="radio" name="sesion" value={s.id}
-                            checked={selectedSesionId === s.id}
-                            onChange={() => setSelectedSesionId(s.id)}
-                            className="text-blue-600" />
-                          <span className="font-medium">{formatSessionDate(s.fecha)}</span>
-                          <span className="text-gray-500">{s.hora}</span>
-                          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                            {s.tipo === 'tutoria' ? 'Tutoría' : 'Clase'} U.{s.unidad}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                    <>
+                      <div className="space-y-2 max-h-48 overflow-y-auto mb-3">
+                        {upcomingSesiones.map((s) => (
+                          <label key={s.id}
+                            className={`flex items-center gap-3 p-2 rounded cursor-pointer text-sm transition ${
+                              selectedSesionId === s.id ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-50 border border-transparent'
+                            }`}>
+                            <input type="radio" name="sesion" value={s.id}
+                              checked={selectedSesionId === s.id}
+                              onChange={() => {
+                                setSelectedSesionId(s.id);
+                                // Pre-fill the date with the session's current date
+                                const d = new Date(s.fecha);
+                                const yyyy = d.getUTCFullYear();
+                                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getUTCDate()).padStart(2, '0');
+                                setEditFecha(`${yyyy}-${mm}-${dd}`);
+                              }}
+                              className="text-blue-600" />
+                            <span className="font-medium">{formatSessionDate(s.fecha)}</span>
+                            <span className="text-gray-500">{s.hora}</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                              {s.tipo === 'tutoria' ? 'Tutoría' : 'Clase'} U.{s.unidad}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {selectedSesionId && (
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nueva fecha para esta sesión</label>
+                          <input type="date" value={editFecha}
+                            onChange={(e) => setEditFecha(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <button onClick={handleSaveSingle}

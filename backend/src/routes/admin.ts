@@ -1312,6 +1312,8 @@ admin_routes.get("/conflicts", async (c) => {
     });
 
     // Group by docente, dia, and hora to find conflicts
+    // A conflict is when the SAME docente teaches DIFFERENT materias at the same time.
+    // Same materia at different centros is NOT a conflict (virtual class, same session).
     const groupedByDocenteTimeSlot = new Map<
       string,
       typeof asignaciones
@@ -1327,22 +1329,30 @@ admin_routes.get("/conflicts", async (c) => {
       groupedByDocenteTimeSlot.get(key)!.push(asig);
     }
 
-    // Check for conflicts where same docente has different centros or niveles at same time
     for (const [key, group] of groupedByDocenteTimeSlot.entries()) {
       if (group.length > 1) {
-        const centroIds = new Set(group.map((g) => g.centroId));
-        const nivelIds = new Set(group.map((g) => g.materia.nivelId));
-
-        if (centroIds.size > 1 || nivelIds.size > 1) {
+        // Only flag as conflict if there are DIFFERENT materias at the same time
+        // Same materia at different centros = same virtual class = NOT a conflict
+        const uniqueMaterias = new Set(group.map((g) => g.materiaId));
+        if (uniqueMaterias.size > 1) {
+          // There are genuinely different materias at the same time slot
           const existing = conflicts.find(
             (c) =>
               c.type === "asignacion" &&
               c.docenteId === group[0].docenteId
           );
 
+          // Deduplicate: only include one entry per unique materia
+          const seenMaterias = new Set<number>();
+          const deduped = group.filter((g) => {
+            if (seenMaterias.has(g.materiaId)) return false;
+            seenMaterias.add(g.materiaId);
+            return true;
+          });
+
           if (existing) {
             existing.conflicts.push(
-              ...group.map((g) => ({
+              ...deduped.map((g) => ({
                 id: g.id,
                 materiaId: g.materiaId,
                 materiaNombre: g.materia.nombre,
@@ -1359,7 +1369,7 @@ admin_routes.get("/conflicts", async (c) => {
               type: "asignacion",
               docenteId: group[0].docenteId,
               docenteNombre: group[0].docente.nombre,
-              conflicts: group.map((g) => ({
+              conflicts: deduped.map((g) => ({
                 id: g.id,
                 materiaId: g.materiaId,
                 materiaNombre: g.materia.nombre,
@@ -1402,13 +1412,18 @@ admin_routes.get("/conflicts", async (c) => {
       groupedByDocenteFecha.get(key)!.push(sesion);
     }
 
-    // Check for overlapping time ranges
+    // Check for overlapping time ranges at DIFFERENT centros
+    // Same docente at same centro on same day is normal (multiple sessions)
+    // Same docente at DIFFERENT centros on same day with overlapping times = conflict
     for (const [key, group] of groupedByDocenteFecha.entries()) {
       if (group.length > 1) {
         for (let i = 0; i < group.length; i++) {
           for (let j = i + 1; j < group.length; j++) {
             const sesion1 = group[i];
             const sesion2 = group[j];
+
+            // Only flag if different centros
+            if (sesion1.centroId === sesion2.centroId) continue;
 
             // Parse times (assuming format "HH:MM")
             const [h1, m1] = sesion1.horaInicio.split(":").map(Number);
