@@ -14,7 +14,7 @@ const PORT = parseInt(process.env.PORT || "3001");
 app.use("*", cors({ origin: "*" }));
 
 app.get("/health", (c) => {
-  return c.json({ status: "ok", version: "2026-04-03b" });
+  return c.json({ status: "ok" });
 });
 
 app.route("/api", public_routes);

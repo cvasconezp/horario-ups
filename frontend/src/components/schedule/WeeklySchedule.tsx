@@ -314,7 +314,12 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
       hasScrolled.current = true;
       // Small delay to ensure layout is rendered
       setTimeout(() => {
-        currentWeekRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const el = currentWeekRef.current;
+        if (!el) return;
+        // Scroll so the week header is visible near the top with some padding
+        const rect = el.getBoundingClientRect();
+        const offset = window.scrollY + rect.top - 100; // 100px padding from top
+        window.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
       }, 300);
     }
   }, [currentAndFutureWeeks]);

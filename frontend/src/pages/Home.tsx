@@ -98,7 +98,10 @@ export const Home: React.FC = () => {
           <p className="text-blue-100 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
             Tu camino para enseñar, transformar y aprender desde la diversidad.
           </p>
-          <p className="text-blue-200/70 text-sm mt-4 italic">
+          <p className="text-blue-200/80 text-sm mt-4 italic">
+            Sapa kuti kikinka allichikushpaka, ñawpakmanmi ashtawan chayanki.
+          </p>
+          <p className="text-blue-200/70 text-xs mt-1">
             {data.periodo.label}
           </p>
         </div>
@@ -200,6 +203,7 @@ export const Home: React.FC = () => {
             <p className="text-gray-500 text-xs leading-relaxed">
               Agrega tus clases a Google Calendar o iCal y recibe recordatorios automáticos.
             </p>
+            <p className="text-gray-400 text-xs italic mt-2">Sapa kuti aula virtualman yaykushpaka, kikinka wiñaypakmi kan.</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3">
@@ -209,6 +213,7 @@ export const Home: React.FC = () => {
             <p className="text-gray-500 text-xs leading-relaxed">
               Visualiza clases online, tutorías presenciales y fechas importantes en un solo lugar.
             </p>
+            <p className="text-gray-400 text-xs italic mt-2">No es la distancia lo que importa, es tu decisión de avanzar.</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mb-3">
@@ -218,6 +223,7 @@ export const Home: React.FC = () => {
             <p className="text-gray-500 text-xs leading-relaxed">
               Encuentra los enlaces de Zoom, horarios de tutoría y datos de contacto de cada materia.
             </p>
+            <p className="text-gray-400 text-xs italic mt-2">Internetpi yachayka rikuchinmi kikinka sapallami yachakuyta atinki.</p>
           </div>
         </div>
       </div>
@@ -263,15 +269,18 @@ export const Home: React.FC = () => {
           </div>
 
           <p className="text-xs text-gray-500 mt-4 italic text-center">
-            No se trata de tener más tiempo, sino de saber usarlo mejor.
+            Avanzar poco a poco también es avanzar. — Ashata ashata ñawpakman rishpaka, chaypash ñawpakmanmi kan.
           </p>
         </div>
       </div>
 
-      {/* Kichwa quote + Docente link */}
+      {/* Motivational phrase + Docente link */}
       <div className="max-w-4xl mx-auto px-4 mt-8 mb-12 text-center space-y-4">
         <p className="text-gray-400 text-sm italic">
-          "Alli yachakuy, alli kawsay" — Buen aprendizaje, buena vida.
+          Mana pantallata rikushpallachu yachanki, shamuk pacha tikrachunmi yachanki.
+        </p>
+        <p className="text-gray-500 text-xs">
+          No estudias solo frente a una pantalla, estudias para transformar tu futuro.
         </p>
         <Link
           to="/login"
