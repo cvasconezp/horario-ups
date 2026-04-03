@@ -246,4 +246,152 @@ public_routes.get("/docente/:docenteId/horario/:periodoId", async (c) => {
   }
 });
 
+// ============================================================
+// iCal endpoint for calendar subscription
+// ============================================================
+public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
+  try {
+    const { periodoId, nivelId, centroId } = c.req.param();
+    const pId = parseInt(periodoId);
+    const nId = parseInt(nivelId);
+    const cId = parseInt(centroId);
+
+    const [periodo, nivel, centro, sesionesOnline, sesionesPresenciales, eventos] = await Promise.all([
+      prisma.periodo.findUnique({ where: { id: pId } }),
+      prisma.nivel.findUnique({ where: { id: nId } }),
+      prisma.centro.findUnique({ where: { id: cId } }),
+      prisma.sesionOnline.findMany({
+        where: { materia: { periodoId: pId, nivelId: nId } },
+        include: { materia: true },
+        orderBy: { fecha: "asc" },
+      }),
+      prisma.sesionPresencial.findMany({
+        where: { centroId: cId, materia: { periodoId: pId, nivelId: nId } },
+        include: { materia: true, docente: true },
+        orderBy: { fecha: "asc" },
+      }),
+      prisma.calendarioEvento.findMany({
+        where: { periodoId: pId },
+        orderBy: { fecha: "asc" },
+      }),
+    ]);
+
+    if (!periodo || !nivel || !centro) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const calName = `Horario ${nivel.nombre} - ${centro.nombre} - ${periodo.label}`;
+    const now = formatICalDate(new Date());
+
+    let ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//UPS//Horario EIB//ES",
+      `X-WR-CALNAME:${calName}`,
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+    ];
+
+    // Online sessions as events
+    for (const s of sesionesOnline) {
+      const dtStart = formatICalDateTime(s.fecha, s.hora);
+      const dtEnd = formatICalDateTime(s.fecha, s.hora, 2); // 2 hour duration
+      const summary = `${s.materia.nombreCorto} - ${s.tipo === "tutoria" ? "Tutoría" : "Clase"} Online`;
+      const description = `Materia: ${s.materia.nombre}\\nTipo: ${s.tipo}\\nUnidad: ${s.unidad}${s.grupo ? "\\nGrupo: " + s.grupo : ""}`;
+
+      ics.push(
+        "BEGIN:VEVENT",
+        `UID:online-${s.id}@horario-ups`,
+        `DTSTAMP:${now}`,
+        `DTSTART:${dtStart}`,
+        `DTEND:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        "END:VEVENT"
+      );
+    }
+
+    // Presencial sessions as events
+    for (const s of sesionesPresenciales) {
+      const dtStart = formatICalDateTime(s.fecha, s.horaInicio);
+      const dtEnd = formatICalDateTime(s.fecha, s.horaFin);
+      const tipoLabel = s.tipo === "examen" ? "Examen" : "Clase Presencial";
+      const summary = `${s.materia.nombreCorto} - ${tipoLabel}`;
+      const description = `Materia: ${s.materia.nombre}\\nTipo: ${tipoLabel}\\nBimestre: ${s.bimestre}${s.docente ? "\\nDocente: " + s.docente.nombre : ""}`;
+      const location = centro.nombre;
+
+      ics.push(
+        "BEGIN:VEVENT",
+        `UID:presencial-${s.id}@horario-ups`,
+        `DTSTAMP:${now}`,
+        `DTSTART:${dtStart}`,
+        `DTEND:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        `LOCATION:${location}`,
+        "END:VEVENT"
+      );
+    }
+
+    // Calendar events
+    for (const e of eventos) {
+      const dtStart = formatICalDate(e.fecha);
+      const dtEnd = e.fechaFin ? formatICalDate(e.fechaFin) : dtStart;
+      const summary = `${e.tipo}${e.bimestre ? " - Bimestre " + e.bimestre : ""}`;
+      const description = e.nota ? e.nota.replace(/\n/g, "\\n") : "";
+
+      ics.push(
+        "BEGIN:VEVENT",
+        `UID:evento-${e.id}@horario-ups`,
+        `DTSTAMP:${now}`,
+        `DTSTART;VALUE=DATE:${dtStart}`,
+        `DTEND;VALUE=DATE:${dtEnd}`,
+        `SUMMARY:${summary}`,
+        description ? `DESCRIPTION:${description}` : "",
+        "END:VEVENT"
+      );
+    }
+
+    ics.push("END:VCALENDAR");
+
+    // Filter out empty lines
+    const body = ics.filter((line) => line !== "").join("\r\n");
+
+    return new Response(body, {
+      headers: {
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Content-Disposition": `attachment; filename="horario-${periodoId}-${nivelId}-${centroId}.ics"`,
+        "Cache-Control": "no-cache",
+      },
+    });
+  } catch (error) {
+    console.error("[iCal Error]", error);
+    return c.json({ error: "Failed to generate calendar" }, 500);
+  }
+});
+
+// Helper: format Date as iCal date (YYYYMMDD)
+function formatICalDate(d: Date): string {
+  const date = new Date(d);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
+
+// Helper: format Date + time string as iCal datetime (YYYYMMDDTHHMMSS)
+function formatICalDateTime(d: Date, timeStr: string, addHours: number = 0): string {
+  const date = new Date(d);
+  // timeStr format: "HH:MM" or "HH:MM:SS"
+  const parts = timeStr.split(":");
+  const hours = parseInt(parts[0]) + addHours;
+  const minutes = parseInt(parts[1]) || 0;
+  const y = date.getUTCFullYear();
+  const mo = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const h = String(hours).padStart(2, "0");
+  const mi = String(minutes).padStart(2, "0");
+  return `${y}${mo}${day}T${h}${mi}00`;
+}
+
 export default public_routes;
