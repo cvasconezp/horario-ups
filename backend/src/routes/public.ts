@@ -65,45 +65,74 @@ public_routes.get("/centros", async (c) => {
   }
 });
 
-public_routes.get("/horario/:periodoId/:nivelId/:centroId", async (c) => {
+public_routes.get("/horarios/:periodoId/:nivelId/:centroId", async (c) => {
   try {
     const { periodoId, nivelId, centroId } = c.req.param();
 
-    const materias = await prisma.materia.findMany({
-      where: {
-        periodoId: parseInt(periodoId),
-        nivelId: parseInt(nivelId),
-      },
-      include: {
-        asignaciones: {
-          where: {
-            centroId: parseInt(centroId),
+    const [periodo, nivel, centro, materias] = await Promise.all([
+      prisma.periodo.findUnique({ where: { id: parseInt(periodoId) } }),
+      prisma.nivel.findUnique({ where: { id: parseInt(nivelId) } }),
+      prisma.centro.findUnique({ where: { id: parseInt(centroId) } }),
+      prisma.materia.findMany({
+        where: {
+          periodoId: parseInt(periodoId),
+          nivelId: parseInt(nivelId),
+        },
+        include: {
+          asignaciones: {
+            where: {
+              centroId: parseInt(centroId),
+            },
+            include: {
+              docente: true,
+              centro: true,
+            },
           },
-          include: {
-            docente: true,
-            centro: true,
+          presenciales: {
+            where: {
+              centroId: parseInt(centroId),
+            },
+            include: {
+              docente: true,
+            },
           },
         },
-        presenciales: {
-          where: {
-            centroId: parseInt(centroId),
-          },
-          include: {
-            docente: true,
-          },
-        },
-      },
+      }),
+    ]);
+
+    if (!periodo || !nivel || !centro) {
+      return c.json({ error: "Periodo, nivel, or centro not found" }, 404);
+    }
+
+    // Transform materias to include docente and enlaceVirtual from asignaciones
+    const materiasConDocente = materias.map((m) => {
+      const asignacion = m.asignaciones[0];
+      return {
+        ...m,
+        docente: asignacion?.docente || null,
+        enlaceVirtual: asignacion?.enlaceVirtual || null,
+      };
     });
 
-    return c.json(materias);
+    return c.json({
+      periodo,
+      nivel,
+      centro,
+      materias: materiasConDocente,
+    });
   } catch (error) {
     return c.json({ error: "Failed to fetch schedule" }, 500);
   }
 });
 
-public_routes.get("/sesiones-online/:periodoId/:nivelId", async (c) => {
+public_routes.get("/sesiones-online", async (c) => {
   try {
-    const { periodoId, nivelId } = c.req.param();
+    const periodoId = c.req.query("periodoId");
+    const nivelId = c.req.query("nivelId");
+
+    if (!periodoId || !nivelId) {
+      return c.json({ error: "periodoId and nivelId are required" }, 400);
+    }
 
     const sesiones = await prisma.sesionOnline.findMany({
       where: {
@@ -124,9 +153,15 @@ public_routes.get("/sesiones-online/:periodoId/:nivelId", async (c) => {
   }
 });
 
-public_routes.get("/presenciales/:periodoId/:nivelId/:centroId", async (c) => {
+public_routes.get("/sesiones-presenciales", async (c) => {
   try {
-    const { periodoId, nivelId, centroId } = c.req.param();
+    const periodoId = c.req.query("periodoId");
+    const nivelId = c.req.query("nivelId");
+    const centroId = c.req.query("centroId");
+
+    if (!periodoId || !nivelId || !centroId) {
+      return c.json({ error: "periodoId, nivelId, and centroId are required" }, 400);
+    }
 
     const sesiones = await prisma.sesionPresencial.findMany({
       where: {
@@ -149,9 +184,13 @@ public_routes.get("/presenciales/:periodoId/:nivelId/:centroId", async (c) => {
   }
 });
 
-public_routes.get("/calendario/:periodoId", async (c) => {
+public_routes.get("/calendario", async (c) => {
   try {
-    const { periodoId } = c.req.param();
+    const periodoId = c.req.query("periodoId");
+
+    if (!periodoId) {
+      return c.json({ error: "periodoId is required" }, 400);
+    }
 
     const eventos = await prisma.calendarioEvento.findMany({
       where: {

@@ -46,7 +46,7 @@ auth_routes.post("/login", async (c) => {
 
     return c.json({
       token,
-      user: {
+      usuario: {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,

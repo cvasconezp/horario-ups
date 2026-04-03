@@ -22,8 +22,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && usuario?.rol !== requiredRole) {
-    return <Navigate to="/" replace />;
+  if (requiredRole) {
+    const roleMap: Record<string, string[]> = {
+      admin: ['superadmin', 'coordinador'],
+      docente: ['docente', 'superadmin', 'coordinador'],
+    };
+    const allowedRoles = roleMap[requiredRole] || [requiredRole];
+    if (!usuario?.rol || !allowedRoles.includes(usuario.rol)) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <>{children}</>;
