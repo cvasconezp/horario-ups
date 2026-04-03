@@ -26,7 +26,7 @@ export const ScheduleView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<
     'semanal' | 'online' | 'presenciales' | 'calendario'
-  >('online');
+  >('semanal');
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,10 +89,10 @@ export const ScheduleView: React.FC = () => {
   }
 
   const tabs = [
-    { id: 'online', label: 'Clases en Línea', count: sesionesOnline.length },
-    { id: 'presenciales', label: 'Presenciales', count: sesionesPresenciales.length },
-    { id: 'calendario', label: 'Fechas', count: eventos.length },
-    { id: 'semanal', label: 'Horario Semanal', count: horario.materias.length },
+    { id: 'semanal', label: 'Horario Semanal', count: undefined },
+    { id: 'online', label: 'Clases y Tutorías en Línea', count: sesionesOnline.length },
+    { id: 'presenciales', label: 'Tutorías Presenciales', count: sesionesPresenciales.length },
+    { id: 'calendario', label: 'Fechas Importantes', count: eventos.length },
   ] as const;
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -155,9 +155,11 @@ export const ScheduleView: React.FC = () => {
             }`}
           >
             {tab.label}
-            <span className="ml-2 text-sm bg-white/20 px-2 py-0.5 rounded">
-              {tab.count}
-            </span>
+            {tab.count !== undefined && (
+              <span className="ml-2 text-sm bg-white/20 px-2 py-0.5 rounded">
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -167,6 +169,7 @@ export const ScheduleView: React.FC = () => {
         {activeTab === 'semanal' && (
           <WeeklySchedule
             materias={horario.materias}
+            sesionesOnline={sesionesOnline}
             presenciales={sesionesPresenciales}
             eventos={eventos}
             centroId={parseInt(centroId!)}

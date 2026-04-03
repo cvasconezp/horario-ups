@@ -1,304 +1,360 @@
-import React from 'react';
-import type { Materia, SesionPresencial, CalendarioEvento } from '../../types';
-import { Calendar, Clock } from 'lucide-react';
+import React, { useMemo } from 'react';
+import type { Materia, SesionOnline, SesionPresencial, CalendarioEvento } from '../../types';
+import { Calendar, Clock, Video, MapPin, BookOpen } from 'lucide-react';
 
 interface WeeklyScheduleProps {
   materias: (Materia & {
     docente: { id: number; nombre: string; email: string | null };
     enlaceVirtual: string | null;
   })[];
+  sesionesOnline?: SesionOnline[];
   presenciales?: SesionPresencial[];
   eventos?: CalendarioEvento[];
   centroId?: number;
 }
 
-const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-
-const dayColorMap: Record<string, string> = {
-  Lunes: 'border-l-schedule-lunes',
-  Martes: 'border-l-schedule-martes',
-  Miércoles: 'border-l-schedule-miercoles',
-  Jueves: 'border-l-schedule-jueves',
-  Viernes: 'border-l-schedule-viernes',
-};
-
-const getBimestreLabel = (bimestre: number): string => {
-  if (bimestre === 1) return '1er Bimestre';
-  if (bimestre === 2) return '2do Bimestre';
-  return 'Semestral';
-};
-
-const getBimestreColor = (bimestre: number): { bg: string; text: string } => {
-  if (bimestre === 1) return { bg: '#bee3f8', text: '#2a4365' };
-  if (bimestre === 2) return { bg: '#fefcbf', text: '#744210' };
-  return { bg: '#c6f6d5', text: '#22543d' };
-};
-
-const getClaseTypeColor = (tipo: string): { bg: string; text: string } => {
-  if (tipo?.toUpperCase() === 'TUTORÍA') {
-    return { bg: '#c6f6d5', text: '#22543d' };
-  }
-  return { bg: '#bee3f8', text: '#2a4365' };
-};
-
-const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  const day = date.getDate();
-  const monthIndex = date.getMonth();
-  const months = [
-    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
-  ];
-  return `${day} ${months[monthIndex]}`;
-};
+// Unified event type for the timeline
+interface TimelineEvent {
+  id: string;
+  fecha: Date;
+  fechaStr: string;
+  hora: string;
+  horaFin?: string;
+  titulo: string;
+  subtitulo?: string;
+  tipo: 'online' | 'presencial' | 'evento';
+  badge: string;
+  badgeColor: { bg: string; text: string };
+  enlace?: string | null;
+  isPast: boolean;
+}
 
 const getZonaBimestre = (centroId: number | undefined, materia: any): number => {
-  if (!centroId) {
-    return materia.bimestreOC ?? materia.bimestreRL ?? 0;
-  }
-  // Zona Norte: centroId 2, 3, 5, 6 -> use bimestreOC
-  // Zona Sur: centroId 1, 4 -> use bimestreRL
+  if (!centroId) return materia.bimestreOC ?? materia.bimestreRL ?? 0;
   const isZonaNorte = [2, 3, 5, 6].includes(centroId);
-  if (isZonaNorte) {
-    return materia.bimestreOC ?? 0;
-  } else {
-    return materia.bimestreRL ?? 0;
-  }
+  return isZonaNorte ? (materia.bimestreOC ?? 0) : (materia.bimestreRL ?? 0);
 };
 
-const getPresencialTypeColor = (tipo: string): { bg: string; text: string } => {
-  const tipoUpper = tipo?.toUpperCase() || '';
-  if (tipoUpper === 'EXAMEN') {
-    return { bg: '#fed7d7', text: '#742a2a' };
-  }
-  if (tipoUpper === 'CLASE') {
-    return { bg: '#bee3f8', text: '#2a4365' };
-  }
-  return { bg: '#e6f3ff', text: '#1e3a5f' };
+const parseUTCDate = (dateStr: string): Date => {
+  const d = new Date(dateStr);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 };
 
-const getEventTypeColor = (tipo: string): { bg: string; text: string } => {
-  const tipoLower = tipo?.toLowerCase() || '';
-  if (tipoLower.includes('fin')) {
-    return { bg: '#fbd38d', text: '#744210' };
-  }
-  if (tipoLower.includes('inicio')) {
-    return { bg: '#c6f6d5', text: '#22543d' };
-  }
-  if (tipoLower.includes('entrega')) {
-    return { bg: '#bee3f8', text: '#2a4365' };
-  }
-  return { bg: '#e6e6fa', text: '#2d2d4d' };
+const formatDateLong = (date: Date): string => {
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
 };
 
-const isFutureDate = (dateStr: string): boolean => {
-  const date = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date >= today;
+const formatDateShort = (date: Date): string => {
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${date.getDate()} ${months[date.getMonth()]}`;
+};
+
+const getWeekKey = (date: Date): string => {
+  // ISO week: Monday-based
+  const d = new Date(date);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // go to Monday
+  return d.toISOString().slice(0, 10);
+};
+
+const getWeekLabel = (weekStart: Date): string => {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const startStr = `${weekStart.getDate()} ${months[weekStart.getMonth()]}`;
+  const endStr = `${weekEnd.getDate()} ${months[weekEnd.getMonth()]}`;
+  return `Semana del ${startStr} al ${endStr}`;
 };
 
 export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
   materias,
+  sesionesOnline = [],
   presenciales = [],
   eventos = [],
   centroId,
 }) => {
-  // Filter out 2do bimestre materias (not yet confirmed) and group by day
-  const filteredMaterias = materias.filter((m) => {
-    const bim = getZonaBimestre(centroId, m);
-    // Hide 2do bimestre materias — schedule not confirmed yet
-    return bim !== 2;
-  });
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
-  const materiasByDay: Record<string, typeof materias> = {};
-  daysOfWeek.forEach((day) => {
-    materiasByDay[day] = filteredMaterias.filter((m) => m.dia === day);
-  });
+  const timelineEvents = useMemo(() => {
+    const allEvents: TimelineEvent[] = [];
 
-  // Get upcoming presencial sessions (next 5, sorted by date)
-  const upcomingPresenciales = presenciales
-    .filter((p) => isFutureDate(p.fecha))
-    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-    .slice(0, 5);
+    // Build enlaceVirtual lookup from materias prop (which has asignacion data)
+    const enlaceMap = new Map<number, string>();
+    materias.forEach((m) => {
+      if (m.enlaceVirtual) enlaceMap.set(m.id, m.enlaceVirtual);
+    });
 
-  // Get upcoming calendar events (next 5, sorted by date)
-  const upcomingEventos = eventos
-    .filter((e) => isFutureDate(e.fecha))
-    .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-    .slice(0, 5);
+    // Filter out 2do bimestre materias
+    const filteredOnline = sesionesOnline.filter((s) => {
+      if (!s.materia) return true;
+      const bim = getZonaBimestre(centroId, s.materia);
+      return bim !== 2;
+    });
+
+    // 1. Online sessions → timeline events
+    filteredOnline.forEach((sesion) => {
+      const fecha = parseUTCDate(sesion.fecha);
+      const materia = sesion.materia;
+      const duracion = materia?.duracion; // in minutes
+      let horaFin: string | undefined;
+      if (duracion && sesion.hora) {
+        const [h, m] = sesion.hora.split(':').map(Number);
+        const totalMin = h * 60 + m + duracion;
+        horaFin = `${Math.floor(totalMin / 60).toString().padStart(2, '0')}:${(totalMin % 60).toString().padStart(2, '0')}`;
+      }
+
+      allEvents.push({
+        id: `online-${sesion.id}`,
+        fecha,
+        fechaStr: sesion.fecha,
+        hora: sesion.hora,
+        horaFin,
+        titulo: materia?.nombre || 'Sesión en línea',
+        subtitulo: materia ? `${sesion.tipo} U.${sesion.unidad}` : undefined,
+        tipo: 'online',
+        badge: sesion.tipo?.toUpperCase() === 'TUTORÍA' ? 'TUTORÍA EN LÍNEA' : 'CLASE EN LÍNEA',
+        badgeColor: sesion.tipo?.toUpperCase() === 'TUTORÍA'
+          ? { bg: '#c6f6d5', text: '#22543d' }
+          : { bg: '#bee3f8', text: '#2a4365' },
+        enlace: (materia ? enlaceMap.get(materia.id) : null) || null,
+        isPast: fecha < today,
+      });
+    });
+
+    // 2. Presencial sessions → timeline events
+    presenciales.forEach((sesion) => {
+      const fecha = parseUTCDate(sesion.fecha);
+      allEvents.push({
+        id: `presencial-${sesion.id}`,
+        fecha,
+        fechaStr: sesion.fecha,
+        hora: sesion.horaInicio,
+        horaFin: sesion.horaFin,
+        titulo: sesion.materia?.nombre || 'Sesión presencial',
+        subtitulo: sesion.docente?.nombre,
+        tipo: 'presencial',
+        badge: sesion.tipo?.toUpperCase() === 'EXAMEN' ? 'EXAMEN PRESENCIAL' : 'TUTORÍA PRESENCIAL',
+        badgeColor: sesion.tipo?.toUpperCase() === 'EXAMEN'
+          ? { bg: '#fed7d7', text: '#742a2a' }
+          : { bg: '#fefcbf', text: '#744210' },
+        isPast: fecha < today,
+      });
+    });
+
+    // 3. Calendar events → timeline events
+    eventos.forEach((evento) => {
+      const fecha = parseUTCDate(evento.fecha);
+      allEvents.push({
+        id: `evento-${evento.id}`,
+        fecha,
+        fechaStr: evento.fecha,
+        hora: '',
+        titulo: evento.nota || evento.tipo,
+        subtitulo: evento.fechaFin && evento.fechaFin !== evento.fecha
+          ? `Hasta ${formatDateShort(parseUTCDate(evento.fechaFin))}`
+          : undefined,
+        tipo: 'evento',
+        badge: evento.tipo.toUpperCase(),
+        badgeColor: evento.tipo.toLowerCase().includes('entrega')
+          ? { bg: '#bee3f8', text: '#2a4365' }
+          : evento.tipo.toLowerCase().includes('inicio')
+            ? { bg: '#c6f6d5', text: '#22543d' }
+            : evento.tipo.toLowerCase().includes('fin')
+              ? { bg: '#fbd38d', text: '#744210' }
+              : { bg: '#e6e6fa', text: '#2d2d4d' },
+        isPast: fecha < today,
+      });
+    });
+
+    // Sort chronologically, then by hora
+    allEvents.sort((a, b) => {
+      const dateDiff = a.fecha.getTime() - b.fecha.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return (a.hora || '').localeCompare(b.hora || '');
+    });
+
+    return allEvents;
+  }, [sesionesOnline, presenciales, eventos, centroId, today]);
+
+  // Group events by week
+  const weekGroups = useMemo(() => {
+    const groups: { weekKey: string; weekStart: Date; events: TimelineEvent[] }[] = [];
+    const weekMap = new Map<string, TimelineEvent[]>();
+
+    timelineEvents.forEach((event) => {
+      const key = getWeekKey(event.fecha);
+      if (!weekMap.has(key)) weekMap.set(key, []);
+      weekMap.get(key)!.push(event);
+    });
+
+    // Sort weeks chronologically
+    const sortedKeys = [...weekMap.keys()].sort();
+    sortedKeys.forEach((key) => {
+      const weekStart = new Date(key + 'T00:00:00');
+      groups.push({ weekKey: key, weekStart, events: weekMap.get(key)! });
+    });
+
+    return groups;
+  }, [timelineEvents]);
+
+  // Find the current week key to highlight it
+  const currentWeekKey = useMemo(() => getWeekKey(today), [today]);
+
+  // Group events within a week by date
+  const groupByDate = (events: TimelineEvent[]) => {
+    const dateMap = new Map<string, TimelineEvent[]>();
+    events.forEach((e) => {
+      const key = e.fecha.toISOString().slice(0, 10);
+      if (!dateMap.has(key)) dateMap.set(key, []);
+      dateMap.get(key)!.push(e);
+    });
+    return [...dateMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  };
+
+  const getIcon = (tipo: TimelineEvent['tipo']) => {
+    switch (tipo) {
+      case 'online': return <Video size={14} className="flex-shrink-0" />;
+      case 'presencial': return <MapPin size={14} className="flex-shrink-0" />;
+      case 'evento': return <BookOpen size={14} className="flex-shrink-0" />;
+    }
+  };
+
+  const getBorderColor = (tipo: TimelineEvent['tipo']) => {
+    switch (tipo) {
+      case 'online': return 'border-l-blue-400';
+      case 'presencial': return 'border-l-amber-400';
+      case 'evento': return 'border-l-purple-400';
+    }
+  };
+
+  const getBgColor = (tipo: TimelineEvent['tipo'], isPast: boolean) => {
+    if (isPast) return 'bg-gray-50 opacity-60';
+    switch (tipo) {
+      case 'online': return 'bg-blue-50';
+      case 'presencial': return 'bg-amber-50';
+      case 'evento': return 'bg-purple-50';
+    }
+  };
+
+  if (timelineEvents.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-500">
+        <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
+        <p>No hay eventos programados</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
-      {/* Weekly Schedule Grid */}
-      <section>
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Horario Semanal</h2>
-        <div className="space-y-6">
-          {daysOfWeek.map((day) => (
-            <div key={day} className="space-y-2">
-              <h3 className="text-lg font-bold text-gray-900">{day}</h3>
-              {materiasByDay[day].length === 0 ? (
-                <p className="text-gray-500 text-sm">No hay sesiones para este día</p>
-              ) : (
-                <div className="space-y-2">
-                  {materiasByDay[day].map((materia) => {
-                    const bimestre = getZonaBimestre(centroId, materia);
-                    const bimestreColor = getBimestreColor(bimestre);
-                    const claseTypeColor = getClaseTypeColor(materia.tipo);
-                    return (
-                      <div
-                        key={materia.id}
-                        className={`schedule-row border-l-4 ${dayColorMap[day] || 'border-l-gray-400'} pl-4 py-3 mb-2 bg-gray-50 rounded hover:shadow-md transition`}
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <p className="font-semibold text-gray-900">{materia.nombre}</p>
-                            <p className="text-sm text-gray-600">{materia.nombreCorto}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {materia.hora} {materia.duracion && `(${materia.duracion}h)`}
-                            </p>
-                            <p className="text-sm text-gray-600">{materia.docente?.nombre}</p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {materia.enlaceVirtual && (
-                              <a
-                                href={materia.enlaceVirtual}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs font-medium text-blue-600 hover:text-blue-800 underline"
-                              >
-                                Enlace Virtual
-                              </a>
-                            )}
-                            {bimestre > 0 && (
-                              <span
-                                className="text-xs font-semibold px-3 py-1 rounded"
-                                style={{ backgroundColor: bimestreColor.bg, color: bimestreColor.text }}
-                              >
-                                {getBimestreLabel(bimestre)}
-                              </span>
-                            )}
-                            {materia.tipo && (
-                              <span
-                                className="text-xs font-semibold px-3 py-1 rounded"
-                                style={{ backgroundColor: claseTypeColor.bg, color: claseTypeColor.text }}
-                              >
-                                {materia.tipo.toUpperCase()}
-                              </span>
-                            )}
-                            {materia.tutoria && (
-                              <span className="badge badge-gray text-xs">{materia.tutoria}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+      {weekGroups.map(({ weekKey, weekStart, events }) => {
+        const isCurrentWeek = weekKey === currentWeekKey;
+        const allPast = events.every((e) => e.isPast);
+        const dateGroups = groupByDate(events);
+
+        return (
+          <section key={weekKey} className={allPast ? 'opacity-60' : ''}>
+            {/* Week header */}
+            <div className={`flex items-center gap-3 mb-4 pb-2 border-b-2 ${
+              isCurrentWeek ? 'border-blue-500' : 'border-gray-200'
+            }`}>
+              <Calendar size={18} className={isCurrentWeek ? 'text-blue-600' : 'text-gray-400'} />
+              <h3 className={`text-base font-bold ${
+                isCurrentWeek ? 'text-blue-700' : 'text-gray-700'
+              }`}>
+                {getWeekLabel(weekStart)}
+              </h3>
+              {isCurrentWeek && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                  SEMANA ACTUAL
+                </span>
               )}
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* Upcoming Presencial Sessions */}
-      {upcomingPresenciales.length > 0 && (
-        <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Calendar size={20} />
-            Próximas Presenciales
-          </h2>
-          <div className="space-y-3">
-            {upcomingPresenciales.map((sesion) => {
-              const typeColor = getPresencialTypeColor(sesion.tipo);
-              return (
-                <div
-                  key={sesion.id}
-                  className="border-l-4 border-l-indigo-400 bg-indigo-50 rounded-lg p-4 hover:shadow-md transition"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} className="text-gray-500 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">{formatDate(sesion.fecha)}</p>
-                        <p className="text-xs text-gray-600">{sesion.diaSemana}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock size={16} className="text-gray-500 flex-shrink-0" />
-                      <p className="text-sm font-medium text-gray-900">
-                        {sesion.horaInicio} - {sesion.horaFin}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{sesion.materia?.nombre || 'Sesión'}</p>
-                      {sesion.docente && (
-                        <p className="text-xs text-gray-600">{sesion.docente.nombre}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-end">
-                      <span
-                        className="text-xs font-semibold px-3 py-1 rounded whitespace-nowrap"
-                        style={{ backgroundColor: typeColor.bg, color: typeColor.text }}
-                      >
-                        {sesion.tipo.toUpperCase()}
+            {/* Days within the week */}
+            <div className="space-y-4 ml-2">
+              {dateGroups.map(([dateKey, dayEvents]) => {
+                const date = new Date(dateKey + 'T00:00:00');
+                const isToday = dateKey === today.toISOString().slice(0, 10);
+
+                return (
+                  <div key={dateKey}>
+                    {/* Day header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-sm font-semibold ${
+                        isToday ? 'text-blue-700 bg-blue-100 px-2 py-0.5 rounded' : 'text-gray-600'
+                      }`}>
+                        {formatDateLong(date)}
+                        {isToday && ' — Hoy'}
                       </span>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
-      {/* Upcoming Calendar Events */}
-      {upcomingEventos.length > 0 && (
-        <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Calendar size={20} />
-            Próximas Fechas Importantes
-          </h2>
-          <div className="space-y-3">
-            {upcomingEventos.map((evento) => {
-              const eventColor = getEventTypeColor(evento.tipo);
-              return (
-                <div
-                  key={evento.id}
-                  className="border-l-4 border-l-purple-400 bg-purple-50 rounded-lg p-4 hover:shadow-md transition"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} className="text-gray-500 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{formatDate(evento.fecha)}</p>
-                        {evento.fechaFin && evento.fechaFin !== evento.fecha && (
-                          <p className="text-xs text-gray-600">hasta {formatDate(evento.fechaFin)}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-xs font-semibold px-3 py-1 rounded whitespace-nowrap"
-                        style={{ backgroundColor: eventColor.bg, color: eventColor.text }}
-                      >
-                        {evento.tipo}
-                      </span>
-                    </div>
-                    <div>
-                      {evento.nota && (
-                        <p className="text-sm text-gray-900">{evento.nota}</p>
-                      )}
+                    {/* Events for the day */}
+                    <div className="space-y-2 ml-4">
+                      {dayEvents.map((event) => (
+                        <div
+                          key={event.id}
+                          className={`border-l-4 ${getBorderColor(event.tipo)} ${getBgColor(event.tipo, event.isPast)} rounded-lg p-3 hover:shadow-md transition`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            {/* Time */}
+                            {event.hora && (
+                              <div className="flex items-center gap-1 text-sm font-mono font-medium text-gray-700 sm:w-32 flex-shrink-0">
+                                <Clock size={14} className="text-gray-400 flex-shrink-0" />
+                                {event.hora}
+                                {event.horaFin && ` - ${event.horaFin}`}
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 text-sm leading-tight">
+                                {event.titulo}
+                              </p>
+                              {event.subtitulo && (
+                                <p className="text-xs text-gray-600 mt-0.5">{event.subtitulo}</p>
+                              )}
+                            </div>
+
+                            {/* Badge + link */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {event.enlace && (
+                                <a
+                                  href={event.enlace}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs font-medium text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                                >
+                                  Enlace
+                                </a>
+                              )}
+                              <span
+                                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                                style={{ backgroundColor: event.badgeColor.bg, color: event.badgeColor.text }}
+                              >
+                                {getIcon(event.tipo)}
+                                {event.badge}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 };
