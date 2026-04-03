@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUsuario(usuario);
     } catch (err) {
       const message = axios.isAxiosError(err)
-        ? err.response?.data?.message || 'Login failed'
+        ? err.response?.data?.error || err.response?.data?.message || 'Error al iniciar sesión'
         : 'An error occurred';
       setError(message);
       throw err;

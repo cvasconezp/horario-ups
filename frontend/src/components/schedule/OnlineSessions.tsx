@@ -1,51 +1,18 @@
 import React from 'react';
 import type { SesionOnline } from '../../types';
+import { parseUTCDate, formatSpanishDate, getWeekKey, getWeekStartDate } from '../../utils/dates';
 
 interface OnlineSessionsProps {
   sesiones: SesionOnline[];
 }
 
-const spanishDays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-const spanishMonths = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-const getWeekStartDate = (date: Date): Date => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
-  return new Date(d.setDate(diff));
-};
-
-const formatSpanishDate = (date: Date): string => {
-  const dayName = spanishDays[date.getDay()];
-  const dayNum = date.getDate();
-  const monthName = spanishMonths[date.getMonth()];
-  return `${dayName} ${dayNum} de ${monthName}`;
-};
-
-const getWeekKey = (date: Date): string => {
-  const weekStart = getWeekStartDate(date);
-  return weekStart.toISOString().split('T')[0];
-};
-
 export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
   // Sort by date and time
   const sortedSesiones = [...sesiones].sort((a, b) => {
-    const dateA = new Date(`${a.fecha}T${a.hora}`);
-    const dateB = new Date(`${b.fecha}T${b.hora}`);
-    return dateA.getTime() - dateB.getTime();
+    const dateA = parseUTCDate(a.fecha);
+    const dateB = parseUTCDate(b.fecha);
+    if (dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
+    return (a.hora || '').localeCompare(b.hora || '');
   });
 
   // Group by week
@@ -53,7 +20,7 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
   const weekOrder: string[] = [];
 
   sortedSesiones.forEach((sesion) => {
-    const weekKey = getWeekKey(new Date(sesion.fecha));
+    const weekKey = getWeekKey(parseUTCDate(sesion.fecha));
     if (!sesioniesByWeek[weekKey]) {
       sesioniesByWeek[weekKey] = [];
       weekOrder.push(weekKey);
@@ -68,7 +35,7 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
     <div className="space-y-6">
       {weekOrder.map((weekKey) => {
         const sesionesEnSemana = sesioniesByWeek[weekKey];
-        const weekStart = new Date(weekKey);
+        const weekStart = getWeekStartDate(parseUTCDate(sesionesEnSemana[0].fecha));
         const weekStartSpanish = formatSpanishDate(weekStart);
 
         return (
@@ -76,15 +43,13 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
             <h3 className="text-lg font-bold text-gray-900 mb-3">Semana del {weekStartSpanish}</h3>
             <div className="space-y-2">
               {sesionesEnSemana.map((sesion) => {
-                const fechaCompleta = new Date(`${sesion.fecha}T${sesion.hora}`);
-                const isPast = fechaCompleta < now;
+                const fechaSesion = parseUTCDate(sesion.fecha);
+                const isPast = fechaSesion < now;
                 const isNextUpcoming =
                   !isPast &&
-                  sesionesEnSemana.every(
-                    (s) => new Date(`${s.fecha}T${s.hora}`) >= fechaCompleta
-                  );
+                  sortedSesiones.filter((s) => parseUTCDate(s.fecha) >= now)[0]?.id === sesion.id;
 
-                const formattedDate = formatSpanishDate(new Date(sesion.fecha));
+                const formattedDate = formatSpanishDate(fechaSesion);
 
                 return (
                   <div
@@ -112,13 +77,13 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
                       </div>
                       <div className="flex flex-col gap-2">
                         <span
-                          className="text-xs font-semibold px-3 py-1 rounded self-start"
-                          style={{
-                            backgroundColor: '#bee3f8',
-                            color: '#2a4365',
-                          }}
+                          className={`text-xs font-semibold px-3 py-1 rounded self-start ${
+                            sesion.tipo === 'tutoria'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
                         >
-                          {sesion.tipo?.toUpperCase()}
+                          {sesion.tipo === 'tutoria' ? 'TUTORÍA' : 'CLASE'}
                         </span>
                         {sesion.unidad > 0 && (
                           <span className="text-xs font-semibold px-3 py-1 rounded self-start bg-gray-200 text-gray-800">
@@ -126,7 +91,7 @@ export const OnlineSessions: React.FC<OnlineSessionsProps> = ({ sesiones }) => {
                           </span>
                         )}
                         {sesion.grupo && (
-                          <span className="badge badge-green text-xs self-start">
+                          <span className="text-xs font-semibold px-3 py-1 rounded self-start bg-green-100 text-green-800">
                             {sesion.grupo}
                           </span>
                         )}

@@ -96,14 +96,6 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="border-t border-gray-200 pt-6 bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-            <p className="font-medium text-gray-900 mb-2">Credenciales de demostración:</p>
-            <div className="space-y-1 font-mono text-xs">
-              <p>Admin: admin@ups.edu.ec / admin123</p>
-              <p>Docente: docente@ups.edu.ec / docente123</p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

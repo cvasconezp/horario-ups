@@ -1,32 +1,10 @@
 import React from 'react';
 import type { CalendarioEvento } from '../../types';
+import { parseUTCDate, formatSpanishDate, spanishMonths } from '../../utils/dates';
 
 interface AcademicCalendarProps {
   eventos: CalendarioEvento[];
 }
-
-const spanishDays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-const spanishMonths = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-const formatSpanishDate = (date: Date): string => {
-  const dayName = spanishDays[date.getDay()];
-  const dayNum = date.getDate();
-  const monthName = spanishMonths[date.getMonth()];
-  return `${dayName} ${dayNum} de ${monthName}`;
-};
 
 const getBimestreLabel = (bimestre: number | null): string => {
   if (bimestre === 1) return '1er Bimestre';
@@ -52,9 +30,7 @@ const getTypeColor = (tipo: string): { bg: string; text: string; borderColor: st
 export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) => {
   // Sort by date
   const sortedEventos = [...eventos].sort((a, b) => {
-    const dateA = new Date(a.fecha);
-    const dateB = new Date(b.fecha);
-    return dateA.getTime() - dateB.getTime();
+    return parseUTCDate(a.fecha).getTime() - parseUTCDate(b.fecha).getTime();
   });
 
   // Group by bimestre first, then by month within bimestre
@@ -63,10 +39,8 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
 
   sortedEventos.forEach((evento) => {
     const bimestreLabel = getBimestreLabel(evento.bimestre);
-    const monthKey = new Date(evento.fecha).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-    });
+    const fecha = parseUTCDate(evento.fecha);
+    const monthKey = `${spanishMonths[fecha.getMonth()]} ${fecha.getFullYear()}`;
 
     if (!eventosByBimestre[bimestreLabel]) {
       eventosByBimestre[bimestreLabel] = {};
@@ -91,20 +65,20 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
                 <h3 className="text-lg font-semibold text-gray-700 mb-3 capitalize">{month}</h3>
                 <div className="space-y-2">
                   {eventosEnMes.map((evento) => {
-                    const fechaInicio = new Date(evento.fecha);
+                    const fechaInicio = parseUTCDate(evento.fecha);
                     const formattedDate = formatSpanishDate(fechaInicio);
                     const typeColor = getTypeColor(evento.tipo);
 
                     let formattedEnd = '';
                     if (evento.fechaFin && evento.fechaFin !== evento.fecha) {
-                      const fechaFin = new Date(evento.fechaFin);
+                      const fechaFin = parseUTCDate(evento.fechaFin);
                       formattedEnd = ' - ' + formatSpanishDate(fechaFin);
                     }
 
                     return (
                       <div
                         key={evento.id}
-                        className="border-l-4 pl-4 py-3 rounded hover:shadow-md transition bg-white"
+                        className="border-l-4 pl-4 py-3 rounded hover:shadow-md transition"
                         style={{
                           backgroundColor: typeColor.bg,
                           borderColor: typeColor.borderColor,
@@ -113,24 +87,14 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
                       >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
-                            <p
-                              className="text-xs font-semibold uppercase opacity-75"
-                              style={{ color: typeColor.text }}
-                            >
-                              Fecha
-                            </p>
-                            <p className="font-medium" style={{ color: typeColor.text }}>
+                            <p className="text-xs font-semibold uppercase opacity-75">Fecha</p>
+                            <p className="font-medium">
                               {formattedDate}
                               {formattedEnd}
                             </p>
                           </div>
                           <div>
-                            <p
-                              className="text-xs font-semibold uppercase opacity-75"
-                              style={{ color: typeColor.text }}
-                            >
-                              Tipo
-                            </p>
+                            <p className="text-xs font-semibold uppercase opacity-75">Tipo</p>
                             <span
                               className="inline-block text-xs font-semibold px-3 py-1 rounded"
                               style={{
@@ -142,13 +106,8 @@ export const AcademicCalendar: React.FC<AcademicCalendarProps> = ({ eventos }) =
                             </span>
                           </div>
                           <div>
-                            <p
-                              className="text-xs font-semibold uppercase opacity-75"
-                              style={{ color: typeColor.text }}
-                            >
-                              Descripción
-                            </p>
-                            <p style={{ color: typeColor.text }}>{evento.nota || '-'}</p>
+                            <p className="text-xs font-semibold uppercase opacity-75">Descripción</p>
+                            <p>{evento.nota || '-'}</p>
                           </div>
                         </div>
                       </div>
