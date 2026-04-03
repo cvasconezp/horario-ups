@@ -39,7 +39,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
       <aside
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed md:relative md:translate-x-0 left-0 top-0 w-64 h-screen bg-gradient-header text-white flex flex-col transition-transform duration-300 z-30`}
+        } fixed md:sticky md:translate-x-0 left-0 top-0 w-64 h-screen bg-gradient-header text-white flex flex-col flex-shrink-0 transition-transform duration-300 z-30`}
       >
         <div className="p-6 border-b border-primary-700">
           <h1 className="text-2xl font-bold">Admin Panel</h1>

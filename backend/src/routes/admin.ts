@@ -657,6 +657,30 @@ admin_routes.delete("/materias/:id", async (c) => {
   }
 });
 
+// Full asignaciones list (no pagination) for admin unified table
+admin_routes.get("/asignaciones-all", async (c) => {
+  try {
+    const asignaciones = await prisma.asignacion.findMany({
+      include: {
+        materia: {
+          include: { nivel: true },
+        },
+        docente: true,
+        centro: true,
+      },
+      orderBy: [
+        { materia: { nivel: { numero: "asc" } } },
+        { centro: { nombre: "asc" } },
+        { materia: { dia: "asc" } },
+      ],
+    });
+
+    return c.json(asignaciones);
+  } catch (error) {
+    return c.json({ error: "Failed to fetch all asignaciones" }, 500);
+  }
+});
+
 admin_routes.get("/asignaciones", async (c) => {
   try {
     const { skip, limit } = getPaginationParams(c);
