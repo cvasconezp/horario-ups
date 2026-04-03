@@ -219,48 +219,81 @@ public_routes.get("/sesiones-online", async (c) => {
       orderBy: { fecha: "asc" },
     });
 
-    // If centroId is provided, filter by bimestre based on zona
-    // OC zone: Otavalo (3), Cayambe (2) → use bimestreOC
-    // RL zone: Riobamba (4), Latacunga (1) → use bimestreRL
+    // If centroId is provided, apply two filters:
+    // 1. Filter by "grupo": each session may belong to a specific grupo
+    //    (e.g. "Amazonía Norte") or be general (grupo=null for main 4 centros)
+    // 2. Filter by bimestre based on zona:
+    //    - Zona Norte: Otavalo (3), Cayambe (2), Amazonía Norte (5), Wasakentsa (6) → use bimestreOC
+    //    - Zona Sur: Latacunga (1), Riobamba (4) → use bimestreRL
+    //    - Todos los centros (7): no bimestre filter
     if (centroId) {
       const cId = parseInt(centroId);
-      const ocCentros = [2, 3]; // Cayambe, Otavalo
-      const rlCentros = [1, 4]; // Latacunga, Riobamba
-      const isOC = ocCentros.includes(cId);
-      const isRL = rlCentros.includes(cId);
 
-      if (isOC || isRL) {
-        // Determine current bimestre from date or query param
-        let currentBimestre = bimestre ? parseInt(bimestre) : 0;
-        if (!currentBimestre) {
-          // Auto-detect: check periodo dates
-          const periodo = await prisma.periodo.findUnique({
-            where: { id: parseInt(periodoId) },
-          });
-          if (periodo) {
-            const now = new Date();
-            const inicio = new Date(periodo.fechaInicio);
-            const fin = new Date(periodo.fechaFin);
-            const mid = new Date(
-              inicio.getTime() + (fin.getTime() - inicio.getTime()) / 2
-            );
-            currentBimestre = now < mid ? 1 : 2;
-          } else {
-            currentBimestre = 1;
-          }
+      // Zona mapping
+      const zonaNorteCentros = [2, 3, 5, 6]; // Cayambe, Otavalo, Amazonía Norte, Wasakentsa
+      const zonaSurCentros = [1, 4];          // Latacunga, Riobamba
+      const isNorte = zonaNorteCentros.includes(cId);
+      const isSur = zonaSurCentros.includes(cId);
+
+      // Grupo mapping: which grupo value corresponds to each special centro
+      const centroGrupoMap: Record<number, string> = {
+        5: "Amazonía Norte",
+        // 6: "Wasakentsa", // Add if Wasakentsa has its own grupo sessions
+      };
+
+      // Determine current bimestre
+      let currentBimestre = bimestre ? parseInt(bimestre) : 0;
+      if (!currentBimestre) {
+        const periodo = await prisma.periodo.findUnique({
+          where: { id: parseInt(periodoId) },
+        });
+        if (periodo) {
+          const now = new Date();
+          const inicio = new Date(periodo.fechaInicio);
+          const fin = new Date(periodo.fechaFin);
+          const mid = new Date(
+            inicio.getTime() + (fin.getTime() - inicio.getTime()) / 2
+          );
+          currentBimestre = now < mid ? 1 : 2;
+        } else {
+          currentBimestre = 1;
+        }
+      }
+
+      const expectedGrupo = centroGrupoMap[cId] || null;
+
+      const filtered = sesiones.filter((s) => {
+        // Step 1: Filter by grupo
+        // If centro has a specific grupo (e.g. Amazonía Norte), show only sessions with that grupo
+        // If centro is a main centro (1-4), show only sessions with grupo = null
+        // If centro is "Todos los centros" (7), show all sessions
+        if (cId === 7) {
+          // "Todos los centros" — show Contingencia grupo sessions (nivel 9)
+          // or all sessions if no grupo-based filtering needed
+        } else if (expectedGrupo) {
+          // Special centro: only show sessions matching its grupo
+          if (s.grupo !== expectedGrupo) return false;
+        } else {
+          // Main centro (1-4): only show sessions WITHOUT a specific grupo
+          if (s.grupo !== null && s.grupo !== undefined) return false;
         }
 
-        const filtered = sesiones.filter((s) => {
+        // Step 2: Filter by bimestre based on zona
+        if (isNorte || isSur) {
           const mat = s.materia;
-          const bim = isOC
+          const bim = isNorte
             ? (mat as any).bimestreOC
             : (mat as any).bimestreRL;
           // 0 or null = todo el semestre (show always), otherwise must match current bimestre
-          return bim === null || bim === undefined || bim === 0 || bim === currentBimestre;
-        });
+          if (bim !== null && bim !== undefined && bim !== 0 && bim !== currentBimestre) {
+            return false;
+          }
+        }
 
-        return c.json(filtered);
-      }
+        return true;
+      });
+
+      return c.json(filtered);
     }
 
     return c.json(sesiones);
