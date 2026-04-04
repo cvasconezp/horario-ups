@@ -1615,4 +1615,59 @@ Bloque: ${bimestreLabel}`;
   }
 });
 
+// ============================================================
+// iCal subscription stats
+// ============================================================
+admin_routes.get("/ical-stats", async (c) => {
+  try {
+    const suscripciones = await prisma.icalSuscripcion.findMany({
+      orderBy: { lastFetch: "desc" },
+    });
+
+    // Enrich with names
+    const nivelIds = [...new Set(suscripciones.filter(s => s.nivelId > 0).map(s => s.nivelId))];
+    const centroIds = [...new Set(suscripciones.filter(s => s.centroId > 0).map(s => s.centroId))];
+    const docenteIds = [...new Set(suscripciones.filter(s => s.docenteId && s.docenteId > 0).map(s => s.docenteId!))];
+
+    const [niveles, centros, docentes] = await Promise.all([
+      nivelIds.length > 0 ? prisma.nivel.findMany({ where: { id: { in: nivelIds } } }) : [],
+      centroIds.length > 0 ? prisma.centro.findMany({ where: { id: { in: centroIds } } }) : [],
+      docenteIds.length > 0 ? prisma.docente.findMany({ where: { id: { in: docenteIds } } }) : [],
+    ]);
+
+    const nivelMap = Object.fromEntries(niveles.map(n => [n.id, n.nombre]));
+    const centroMap = Object.fromEntries(centros.map(c => [c.id, c.nombre]));
+    const docenteMap = Object.fromEntries(docentes.map(d => [d.id, d.nombre]));
+
+    const enriched = suscripciones.map(s => ({
+      id: s.id,
+      tipo: s.tipo,
+      nivel: s.nivelId > 0 ? nivelMap[s.nivelId] || `Nivel ${s.nivelId}` : null,
+      centro: s.centroId > 0 ? centroMap[s.centroId] || `Centro ${s.centroId}` : null,
+      docente: s.docenteId && s.docenteId > 0 ? docenteMap[s.docenteId] || `Docente ${s.docenteId}` : null,
+      count: s.count,
+      lastFetch: s.lastFetch,
+      userAgent: s.userAgent,
+      createdAt: s.createdAt,
+    }));
+
+    const totalEstudiantes = suscripciones.filter(s => s.tipo === "estudiante").reduce((sum, s) => sum + s.count, 0);
+    const totalDocentes = suscripciones.filter(s => s.tipo === "docente").reduce((sum, s) => sum + s.count, 0);
+    const uniqueEstudiantes = suscripciones.filter(s => s.tipo === "estudiante").length;
+    const uniqueDocentes = suscripciones.filter(s => s.tipo === "docente").length;
+
+    return c.json({
+      summary: {
+        totalRequests: totalEstudiantes + totalDocentes,
+        estudiantes: { unique: uniqueEstudiantes, totalRequests: totalEstudiantes },
+        docentes: { unique: uniqueDocentes, totalRequests: totalDocentes },
+      },
+      suscripciones: enriched,
+    });
+  } catch (error) {
+    console.error("[iCal Stats Error]", error);
+    return c.json({ error: "Failed to fetch iCal stats" }, 500);
+  }
+});
+
 export default admin_routes;

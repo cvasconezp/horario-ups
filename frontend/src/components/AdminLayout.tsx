@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, Home, BookOpen, Users, Calendar, Upload } from 'lucide-react';
+import { LogOut, Menu, X, Home, BookOpen, Users, Calendar, Upload, BarChart3 } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -31,6 +31,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
     { label: 'Sesiones Presenciales', href: '/admin/presenciales', icon: Calendar },
     { label: 'Calendario', href: '/admin/calendario', icon: Calendar },
     { label: 'Importar', href: '/admin/import', icon: Upload },
+    { label: 'Suscripciones iCal', href: '/admin/ical-stats', icon: BarChart3 },
   ];
 
   return (

@@ -158,6 +158,22 @@ model CalendarioEvento {
   updatedAt DateTime @updatedAt
 }
 
+model IcalSuscripcion {
+  id        Int      @id @default(autoincrement())
+  periodoId Int
+  nivelId   Int
+  centroId  Int
+  tipo      String   @default("estudiante") // estudiante | docente
+  docenteId Int?
+  ip        String?
+  userAgent String?
+  count     Int      @default(1)
+  lastFetch DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([periodoId, nivelId, centroId, tipo, docenteId])
+}
+
 model Usuario {
   id           Int      @id @default(autoincrement())
   email        String   @unique

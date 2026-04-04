@@ -611,6 +611,17 @@ public_routes.get("/ical/docente/:docenteId/:periodoId", async (c) => {
     ics.push("END:VCALENDAR");
     const body = ics.filter((line) => line !== "").join("\r\n");
 
+    // Track docente subscription (fire-and-forget)
+    prisma.icalSuscripcion.upsert({
+      where: {
+        periodoId_nivelId_centroId_tipo_docenteId: {
+          periodoId: pId, nivelId: 0, centroId: 0, tipo: "docente", docenteId: dId,
+        },
+      },
+      update: { count: { increment: 1 }, lastFetch: new Date(), userAgent: c.req.header("user-agent") || null },
+      create: { periodoId: pId, nivelId: 0, centroId: 0, tipo: "docente", docenteId: dId, count: 1, userAgent: c.req.header("user-agent") || null },
+    }).catch(() => {});
+
     return new Response(body, {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
@@ -774,6 +785,17 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
 
     // Filter out empty lines
     const body = ics.filter((line) => line !== "").join("\r\n");
+
+    // Track subscription (fire-and-forget, don't block response)
+    prisma.icalSuscripcion.upsert({
+      where: {
+        periodoId_nivelId_centroId_tipo_docenteId: {
+          periodoId: pId, nivelId: nId, centroId: cId, tipo: "estudiante", docenteId: 0,
+        },
+      },
+      update: { count: { increment: 1 }, lastFetch: new Date(), userAgent: c.req.header("user-agent") || null },
+      create: { periodoId: pId, nivelId: nId, centroId: cId, tipo: "estudiante", docenteId: 0, count: 1, userAgent: c.req.header("user-agent") || null },
+    }).catch(() => {}); // silently ignore if table doesn't exist yet
 
     return new Response(body, {
       headers: {
