@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Menu, X, Home, BookOpen, Users, Calendar, Upload, BarChart3,
-  ChevronDown, ChevronRight, PanelLeftClose, PanelLeft, Settings, Database, FileSpreadsheet,
+  ChevronDown, ChevronRight, PanelLeftClose, PanelLeft, Settings, Database,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
