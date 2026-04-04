@@ -850,4 +850,54 @@ function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// TEMP: Find and fix Inglés Thursday sessions for 2do/4to niveles
+public_routes.get("/temp-fix-ingles-jueves", async (c) => {
+  try {
+    const dryRun = c.req.query("apply") !== "true";
+
+    // Find all SesionOnline for Inglés in niveles 1 (2do) and 2 (4to)
+    const sesiones = await prisma.sesionOnline.findMany({
+      where: {
+        tipo: "CLASE EN LÍNEA",
+        materia: {
+          nombre: { contains: "Ingl", mode: "insensitive" },
+          nivelId: { in: [1, 2] }, // 2do nivel = id 1, 4to nivel = id 2
+        },
+      },
+      include: { materia: { include: { nivel: true, centro: true } } },
+    });
+
+    // Filter only those whose fecha falls on Thursday (day 4)
+    const jueves = sesiones.filter((s) => {
+      const d = new Date(s.fecha);
+      return d.getUTCDay() === 4; // 0=Sun, 4=Thu
+    });
+
+    if (!dryRun && jueves.length > 0) {
+      await prisma.sesionOnline.updateMany({
+        where: { id: { in: jueves.map((s) => s.id) } },
+        data: { tipo: "TUTORÍA EN LÍNEA" },
+      });
+    }
+
+    return c.json({
+      mode: dryRun ? "DRY RUN (add ?apply=true to execute)" : "APPLIED",
+      totalFound: jueves.length,
+      records: jueves.map((s) => ({
+        id: s.id,
+        materia: s.materia.nombre,
+        nivel: (s.materia as any).nivel?.nombre,
+        centro: (s.materia as any).centro?.nombre,
+        fecha: s.fecha,
+        dia: ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][new Date(s.fecha).getUTCDay()],
+        tipoAnterior: "CLASE EN LÍNEA",
+        tipoNuevo: "TUTORÍA EN LÍNEA",
+        hora: s.hora,
+      })),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 export default public_routes;
