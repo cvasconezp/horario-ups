@@ -114,7 +114,8 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
     filteredOnline.forEach((sesion) => {
       const fecha = parseUTCDate(sesion.fecha);
       const materia = sesion.materia;
-      const duracion = materia?.duracion || 90; // default 1h30m
+      // Tutorías last 60min; regular classes use materia duration or default 90min
+      const duracion = sesion.tipo?.toLowerCase() === 'tutoria' ? 60 : (materia?.duracion || 90);
       let horaFin: string | undefined;
       if (sesion.hora) {
         const [h, m] = sesion.hora.split(':').map(Number);

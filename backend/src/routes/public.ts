@@ -571,7 +571,8 @@ public_routes.get("/ical/docente/:docenteId/:periodoId", async (c) => {
 
     for (const s of sesionesOnline) {
       const dtStart = formatICalDateTime(s.fecha, s.hora);
-      const dtEnd = formatICalDateTimeAdd90(s.fecha, s.hora);
+      const durMin = s.tipo === "tutoria" ? 60 : (s.materia.duracion || 90);
+      const dtEnd = formatICalDateTimeAddMin(s.fecha, s.hora, durMin);
       const centros = materiaCentroMap.get(s.materiaId)?.join(", ") || "";
       const summary = `${s.materia.nombreCorto} - ${s.tipo === "tutoria" ? "Tutoría" : "Clase"} Online`;
       const description = `Materia: ${s.materia.nombre}\\nUnidad: ${s.unidad}${centros ? "\\nCentros: " + centros : ""}`;
@@ -716,10 +717,11 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
       "END:VTIMEZONE",
     ];
 
-    // Online sessions as events (duration: 1h30m)
+    // Online sessions as events (tutorías: 60min, clases: materia duration or 90min)
     for (const s of sesionesOnline) {
       const dtStart = formatICalDateTime(s.fecha, s.hora);
-      const dtEnd = formatICalDateTimeAdd90(s.fecha, s.hora); // 1h30m duration
+      const durMin = s.tipo === "tutoria" ? 60 : (s.materia.duracion || 90);
+      const dtEnd = formatICalDateTimeAddMin(s.fecha, s.hora, durMin);
       const summary = `${s.materia.nombreCorto} - ${s.tipo === "tutoria" ? "Tutoría" : "Clase"} Online`;
       const description = `Materia: ${s.materia.nombre}\\nTipo: ${s.tipo}\\nUnidad: ${s.unidad}${s.grupo ? "\\nGrupo: " + s.grupo : ""}`;
 
@@ -836,10 +838,14 @@ function formatICalDateTime(d: Date, timeStr: string, addHours: number = 0): str
 
 // Helper: format Date + time string + 1h30m for online session end time
 function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
+  return formatICalDateTimeAddMin(d, timeStr, 90);
+}
+
+function formatICalDateTimeAddMin(d: Date, timeStr: string, addMinutes: number): string {
   const date = new Date(d);
   const parts = timeStr.split(":");
   let hours = parseInt(parts[0]);
-  let minutes = (parseInt(parts[1]) || 0) + 90; // add 90 minutes
+  let minutes = (parseInt(parts[1]) || 0) + addMinutes;
   hours += Math.floor(minutes / 60);
   minutes = minutes % 60;
   const y = date.getUTCFullYear();
