@@ -5,26 +5,21 @@ import { BarChart3, RefreshCw, Calendar, Users, MapPin } from 'lucide-react';
 
 interface IcalSuscripcion {
   id: number;
-  periodoId: number;
-  nivelId: number;
-  centroId: number;
   tipo: string;
-  docenteId: number | null;
+  nivel: string | null;
+  centro: string | null;
+  docente: string | null;
   count: number;
   lastFetch: string;
   createdAt: string;
   userAgent: string | null;
-  nivelNombre?: string;
-  centroNombre?: string;
-  docenteNombre?: string;
 }
 
 interface IcalStats {
   summary: {
     totalRequests: number;
-    uniqueSuscripciones: number;
-    estudianteRequests: number;
-    docenteRequests: number;
+    estudiantes: { unique: number; totalRequests: number };
+    docentes: { unique: number; totalRequests: number };
   };
   suscripciones: IcalSuscripcion[];
 }
@@ -131,7 +126,7 @@ export const IcalStatsPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Suscripciones Únicas</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.summary.uniqueSuscripciones}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.summary.estudiantes.unique + stats.summary.docentes.unique}</p>
                   </div>
                 </div>
               </div>
@@ -143,7 +138,8 @@ export const IcalStatsPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Estudiantes</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.summary.estudianteRequests}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.summary.estudiantes.totalRequests}</p>
+                    <p className="text-xs text-gray-400">{stats.summary.estudiantes.unique} únicos</p>
                   </div>
                 </div>
               </div>
@@ -155,7 +151,8 @@ export const IcalStatsPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Docentes</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.summary.docenteRequests}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.summary.docentes.totalRequests}</p>
+                    <p className="text-xs text-gray-400">{stats.summary.docentes.unique} únicos</p>
                   </div>
                 </div>
               </div>
@@ -200,10 +197,10 @@ export const IcalStatsPage: React.FC = () => {
                               {s.tipo === 'docente' ? 'Docente' : 'Estudiante'}
                             </span>
                           </td>
-                          <td className="px-4 py-3">{s.nivelNombre || `Nivel ${s.nivelId}`}</td>
-                          <td className="px-4 py-3">{s.centroNombre || `Centro ${s.centroId}`}</td>
+                          <td className="px-4 py-3">{s.nivel || '-'}</td>
+                          <td className="px-4 py-3">{s.centro || '-'}</td>
                           <td className="px-4 py-3 text-gray-500">
-                            {s.tipo === 'docente' ? (s.docenteNombre || '-') : '-'}
+                            {s.tipo === 'docente' ? (s.docente || '-') : '-'}
                           </td>
                           <td className="px-4 py-3 text-right font-semibold">{s.count}</td>
                           <td className="px-4 py-3 text-gray-500">{detectDevice(s.userAgent)}</td>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Mail } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, isLoading, error } = useAuth();
@@ -96,6 +96,23 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
+        </div>
+
+        {/* Docente help box */}
+        <div className="mt-5 bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+          <p className="text-sm font-medium text-blue-900 mb-1">
+            ¿Eres docente y no tienes credenciales?
+          </p>
+          <p className="text-xs text-blue-700">
+            Solicítalas a Carlos Vásconez
+          </p>
+          <a
+            href="mailto:cvasconez@ups.edu.ec?subject=Solicitud%20de%20credenciales%20-%20Horario%20EIB"
+            className="inline-flex items-center gap-1.5 mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+          >
+            <Mail size={14} />
+            cvasconez@ups.edu.ec
+          </a>
         </div>
 
         {/* Footer */}
