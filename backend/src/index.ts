@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
-import { execSync } from "child_process";
 import prisma from "./db.js";
 import { authMiddleware, requireRole } from "./middleware/auth.js";
 import public_routes from "./routes/public.js";
@@ -16,20 +15,6 @@ app.use("*", cors({ origin: "*" }));
 
 app.get("/health", (c) => {
   return c.json({ status: "ok" });
-});
-
-// TEMPORARY: runtime migration endpoint - REMOVE after migration
-app.get("/fix-migrate", async (c) => {
-  try {
-    const output = execSync("npx prisma db push --accept-data-loss", {
-      encoding: "utf-8",
-      timeout: 30000,
-    });
-    return c.json({ ok: true, output });
-  } catch (err: unknown) {
-    const error = err as Error & { stdout?: string; stderr?: string };
-    return c.json({ ok: false, error: error.message, stdout: error.stdout, stderr: error.stderr }, 500);
-  }
 });
 
 app.route("/api", public_routes);
