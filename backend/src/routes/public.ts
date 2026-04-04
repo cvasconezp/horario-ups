@@ -828,4 +828,25 @@ function formatICalDateTimeAdd90(d: Date, timeStr: string): string {
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// TEMPORARY: Move Lengua Indígena V presencial from Apr 18 to Apr 19
+public_routes.get("/fix-presencial-fecha", async (c) => {
+  try {
+    const sesion = await prisma.sesionPresencial.update({
+      where: { id: 276 },
+      data: {
+        fecha: new Date("2026-04-19T00:00:00Z"),
+        diaSemana: "Domingo",
+      },
+    });
+    return c.json({
+      success: true,
+      id: sesion.id,
+      fecha: sesion.fecha,
+      diaSemana: sesion.diaSemana,
+    });
+  } catch (error) {
+    return c.json({ error: String(error) }, 500);
+  }
+});
+
 export default public_routes;
