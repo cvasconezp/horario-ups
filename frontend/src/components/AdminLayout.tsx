@@ -102,7 +102,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-2 overflow-y-auto">
+      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden">
         {menuGroups.map((group) => {
           const isOpen = openGroups.includes(group.label);
           const GroupIcon = group.icon;
@@ -113,7 +113,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle })
               {/* Group header */}
               <button
                 onClick={() => collapsed ? setCollapsed(false) : toggleGroup(group.label)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition hover:bg-primary-700 rounded-md mx-1 ${
+                className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition hover:bg-primary-700 rounded-md ${
                   hasActive ? 'text-white' : 'text-primary-300'
                 } ${collapsed ? 'justify-center' : ''}`}
                 title={collapsed ? group.label : undefined}
