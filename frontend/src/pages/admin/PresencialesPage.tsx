@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import client from '../../api/client';
 import { AdminLayout } from '../../components/AdminLayout';
 import { DataTable } from '../../components/admin/DataTable';
@@ -6,7 +6,21 @@ import type { Column } from '../../components/admin/DataTable';
 import { FormModal } from '../../components/admin/FormModal';
 import type { FormField } from '../../components/admin/FormModal';
 import type { SesionPresencial, Materia, Centro, Docente } from '../../types';
-import { Plus, AlertCircle } from 'lucide-react';
+import { Plus, AlertCircle, Filter, X } from 'lucide-react';
+
+const formatFecha = (raw: string): string => {
+  try {
+    const d = new Date(raw);
+    return d.toLocaleDateString('es-EC', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return raw;
+  }
+};
 
 export const PresencialesPage: React.FC = () => {
   const [sesiones, setSesiones] = useState<SesionPresencial[]>([]);
@@ -19,19 +33,32 @@ export const PresencialesPage: React.FC = () => {
   const [editingItem, setEditingItem] = useState<SesionPresencial | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Filters
+  const [filterMateria, setFilterMateria] = useState('');
+  const [filterCentro, setFilterCentro] = useState('');
+  const [filterBimestre, setFilterBimestre] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
   const columns: Column<SesionPresencial>[] = [
     {
       key: 'materia',
       label: 'Materia',
       render: (_, row) => row.materia?.nombre || '-',
+      sortValue: (row) => row.materia?.nombre || '',
     },
-    { key: 'fecha', label: 'Fecha', sortable: true },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (val) => formatFecha(String(val)),
+      sortValue: (row) => new Date(row.fecha).getTime(),
+    },
     { key: 'diaSemana', label: 'Día' },
     { key: 'horaInicio', label: 'Inicio' },
     {
       key: 'centro',
       label: 'Centro',
       render: (_, row) => row.centro?.nombre || '-',
+      sortValue: (row) => row.centro?.nombre || '',
     },
     { key: 'bimestre', label: 'Bimestre' },
   ];
@@ -65,7 +92,7 @@ export const PresencialesPage: React.FC = () => {
       label: 'Fecha',
       type: 'date',
       required: true,
-      value: editingItem?.fecha || '',
+      value: editingItem?.fecha ? editingItem.fecha.split('T')[0] : '',
     },
     {
       name: 'diaSemana',
@@ -102,7 +129,7 @@ export const PresencialesPage: React.FC = () => {
       name: 'tipo',
       label: 'Tipo',
       type: 'text',
-      placeholder: 'ej: Clase, Taller',
+      placeholder: 'ej: Clase, Taller, Tutoría',
       value: editingItem?.tipo || '',
     },
     {
@@ -122,10 +149,10 @@ export const PresencialesPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [sesionesRes, materiasRes, centrosRes, docentesRes] = await Promise.all([
-        client.get<{ data: SesionPresencial[] }>('/admin/sesiones-presenciales'),
-        client.get<{ data: Materia[] }>('/admin/materias'),
+        client.get<{ data: SesionPresencial[] }>('/admin/sesiones-presenciales?limit=500'),
+        client.get<{ data: Materia[] }>('/admin/materias?limit=500'),
         client.get<{ data: Centro[] }>('/admin/centros'),
-        client.get<{ data: Docente[] }>('/admin/docentes'),
+        client.get<{ data: Docente[] }>('/admin/docentes?limit=500'),
       ]);
       setSesiones(sesionesRes.data.data);
       setMaterias(materiasRes.data.data);
@@ -137,6 +164,40 @@ export const PresencialesPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Derive unique values for filters
+  const uniqueMaterias = useMemo(() => {
+    const names = new Set(sesiones.map((s) => s.materia?.nombre).filter(Boolean));
+    return Array.from(names).sort() as string[];
+  }, [sesiones]);
+
+  const uniqueCentros = useMemo(() => {
+    const names = new Set(sesiones.map((s) => s.centro?.nombre).filter(Boolean));
+    return Array.from(names).sort() as string[];
+  }, [sesiones]);
+
+  const uniqueBimestres = useMemo(() => {
+    const vals = new Set(sesiones.map((s) => s.bimestre).filter((b) => b != null));
+    return Array.from(vals).sort((a, b) => (a as number) - (b as number));
+  }, [sesiones]);
+
+  // Apply filters
+  const filteredSesiones = useMemo(() => {
+    return sesiones.filter((s) => {
+      if (filterMateria && s.materia?.nombre !== filterMateria) return false;
+      if (filterCentro && s.centro?.nombre !== filterCentro) return false;
+      if (filterBimestre && String(s.bimestre) !== filterBimestre) return false;
+      return true;
+    });
+  }, [sesiones, filterMateria, filterCentro, filterBimestre]);
+
+  const activeFilterCount = [filterMateria, filterCentro, filterBimestre].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setFilterMateria('');
+    setFilterCentro('');
+    setFilterBimestre('');
   };
 
   const handleEdit = (item: SesionPresencial) => {
@@ -176,21 +237,88 @@ export const PresencialesPage: React.FC = () => {
   };
 
   return (
-    <AdminLayout pageTitle="Gestionar Sesiones Presenciales">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+    <AdminLayout pageTitle="Sesiones Presenciales">
+      <div className="space-y-4">
+        <div className="flex flex-wrap justify-between items-center gap-2">
           <h1 className="text-2xl font-bold text-gray-900">Sesiones Presenciales</h1>
-          <button
-            onClick={() => {
-              setEditingItem(null);
-              setIsModalOpen(true);
-            }}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Nueva Sesión
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition ${
+                activeFilterCount > 0
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Filter size={16} />
+              Filtros{activeFilterCount > 0 && ` (${activeFilterCount})`}
+            </button>
+            <button
+              onClick={() => {
+                setEditingItem(null);
+                setIsModalOpen(true);
+              }}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Nueva Sesión
+            </button>
+          </div>
         </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="bg-white rounded-lg shadow-md p-4 flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Materia</label>
+              <select
+                value={filterMateria}
+                onChange={(e) => setFilterMateria(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todas</option>
+                {uniqueMaterias.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Centro</label>
+              <select
+                value={filterCentro}
+                onChange={(e) => setFilterCentro(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todos</option>
+                {uniqueCentros.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[100px]">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Bimestre</label>
+              <select
+                value={filterBimestre}
+                onChange={(e) => setFilterBimestre(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todos</option>
+                {uniqueBimestres.map((b) => (
+                  <option key={String(b)} value={String(b)}>{b}</option>
+                ))}
+              </select>
+            </div>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
+              >
+                <X size={14} />
+                Limpiar
+              </button>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -199,13 +327,14 @@ export const PresencialesPage: React.FC = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
           <DataTable<SesionPresencial>
-            data={sesiones}
+            data={filteredSesiones}
             columns={columns}
             onEdit={handleEdit}
             onDelete={handleDelete}
             isLoading={isLoading}
+            pageSize={50}
           />
         </div>
       </div>

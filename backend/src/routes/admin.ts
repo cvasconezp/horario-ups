@@ -49,7 +49,7 @@ const ITEMS_PER_PAGE = 50;
 
 const getPaginationParams = (c: any) => {
   const page = Math.max(1, parseInt(c.req.query("page") || "1"));
-  const limit = Math.min(100, parseInt(c.req.query("limit") || String(ITEMS_PER_PAGE)));
+  const limit = Math.min(1000, parseInt(c.req.query("limit") || String(ITEMS_PER_PAGE)));
   const skip = (page - 1) * limit;
   return { page, limit, skip };
 };

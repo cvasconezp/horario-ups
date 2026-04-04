@@ -10,6 +10,9 @@ import {
   Pencil,
   X,
   Undo2,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
 } from 'lucide-react';
 
 interface AsignacionFull {
@@ -99,8 +102,10 @@ export const AdminDashboard: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [filterNivel, setFilterNivel] = useState('');
   const [filterCentro, setFilterCentro] = useState('');
-  const [filterBloque, setFilterBloque] = useState('');
+  const [filterBloques, setFilterBloques] = useState<string[]>([]);
   const [filterDia, setFilterDia] = useState('');
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Copy state
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -180,11 +185,41 @@ export const AdminDashboard: React.FC = () => {
       }
       if (filterNivel && a.materia.nivel.numero !== parseInt(filterNivel)) return false;
       if (filterCentro && a.centro.id !== parseInt(filterCentro)) return false;
-      if (filterBloque && getBloqueLabel(a) !== filterBloque) return false;
+      if (filterBloques.length > 0 && !filterBloques.includes(getBloqueLabel(a))) return false;
       if (filterDia && a.materia.dia !== filterDia) return false;
       return true;
     });
-  }, [asignaciones, searchText, filterNivel, filterCentro, filterBloque, filterDia]);
+  }, [asignaciones, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
+
+  // Sort filtered
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered;
+    return [...filtered].sort((a, b) => {
+      let aVal: string | number = '';
+      let bVal: string | number = '';
+      switch (sortCol) {
+        case 'nivel': aVal = a.materia.nivel.numero; bVal = b.materia.nivel.numero; break;
+        case 'centro': aVal = a.centro.nombre; bVal = b.centro.nombre; break;
+        case 'bloque': aVal = getBloqueLabel(a); bVal = getBloqueLabel(b); break;
+        case 'asignatura': aVal = a.materia.nombre; bVal = b.materia.nombre; break;
+        case 'docente': aVal = a.docente.nombre; bVal = b.docente.nombre; break;
+        case 'dia': aVal = DIAS.indexOf(a.materia.dia || ''); bVal = DIAS.indexOf(b.materia.dia || ''); break;
+        case 'hora': aVal = a.materia.hora || ''; bVal = b.materia.hora || ''; break;
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortCol, sortDir]);
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
 
   const handleCopyOne = async (asig: AsignacionFull) => {
     await navigator.clipboard.writeText(buildWhatsAppMsg(asig));
@@ -193,7 +228,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleCopyAll = async () => {
-    const text = filtered.map((a) => buildWhatsAppMsg(a)).join('\n\n─────\n\n');
+    const text = sorted.map((a) => buildWhatsAppMsg(a)).join('\n\n─────\n\n');
     await navigator.clipboard.writeText(text);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
@@ -347,7 +382,7 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-sm opacity-80">EIB en Línea</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2 text-sm font-semibold">
-            {filtered.length}/{asignaciones.length}
+            {sorted.length}/{asignaciones.length}
           </div>
         </div>
 
@@ -374,13 +409,21 @@ export const AdminDashboard: React.FC = () => {
               <option value="">Todos los centros</option>
               {centros.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
             </select>
-            <select value={filterBloque} onChange={(e) => setFilterBloque(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-              <option value="">Todos los bloques</option>
-              <option value="1ER BLOQUE">1er Bloque</option>
-              <option value="2DO BLOQUE">2do Bloque</option>
-              <option value="SEMESTRAL">Semestral</option>
-            </select>
+            <div className="flex items-center gap-3 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+              <span className="text-gray-500 text-xs font-medium">Bloque:</span>
+              {['1ER BLOQUE', '2DO BLOQUE', 'SEMESTRAL'].map((b) => {
+                const labels: Record<string, string> = { '1ER BLOQUE': '1er', '2DO BLOQUE': '2do', 'SEMESTRAL': 'Sem.' };
+                const checked = filterBloques.includes(b);
+                return (
+                  <label key={b} className="flex items-center gap-1 cursor-pointer select-none">
+                    <input type="checkbox" checked={checked}
+                      onChange={() => setFilterBloques(checked ? filterBloques.filter((x) => x !== b) : [...filterBloques, b])}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <span className="text-xs">{labels[b]}</span>
+                  </label>
+                );
+              })}
+            </div>
             <select value={filterDia} onChange={(e) => setFilterDia(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
               <option value="">Todos los días</option>
@@ -413,19 +456,33 @@ export const AdminDashboard: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Nivel</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Centro</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Bloque</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Asignatura</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Docente</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Día</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Hora</th>
+                    {[
+                      { id: 'nivel', label: 'Nivel' },
+                      { id: 'centro', label: 'Centro' },
+                      { id: 'bloque', label: 'Bloque' },
+                      { id: 'asignatura', label: 'Asignatura' },
+                      { id: 'docente', label: 'Docente' },
+                      { id: 'dia', label: 'Día' },
+                      { id: 'hora', label: 'Hora' },
+                    ].map((col) => (
+                      <th key={col.id} className="px-4 py-3 text-left font-semibold text-gray-600">
+                        <button onClick={() => handleSort(col.id)}
+                          className="flex items-center gap-1 hover:text-blue-600 transition group">
+                          {col.label}
+                          {sortCol === col.id ? (
+                            sortDir === 'asc' ? <ChevronUp size={14} className="text-blue-600" /> : <ChevronDown size={14} className="text-blue-600" />
+                          ) : (
+                            <ChevronsUpDown size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </button>
+                      </th>
+                    ))}
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">Enlace</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-600">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((asig, idx) => {
+                  {sorted.map((asig, idx) => {
                     const bloqueLabel = getBloqueLabel(asig);
                     const bloqueColor = getBloqueColor(bloqueLabel);
                     const is2do = bloqueLabel === '2DO BLOQUE';
@@ -478,7 +535,7 @@ export const AdminDashboard: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {filtered.length === 0 && !isLoading && (
+              {sorted.length === 0 && !isLoading && (
                 <div className="p-8 text-center text-gray-500">No se encontraron asignaciones con los filtros actuales</div>
               )}
             </div>

@@ -22,8 +22,20 @@ export const SesionesOnlinePage: React.FC = () => {
       key: 'materia',
       label: 'Materia',
       render: (_, row) => row.materia?.nombre || '-',
+      sortValue: (row) => row.materia?.nombre || '',
     },
-    { key: 'fecha', label: 'Fecha', sortable: true },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (val) => {
+        try {
+          return new Date(String(val)).toLocaleDateString('es-EC', {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+          });
+        } catch { return String(val); }
+      },
+      sortValue: (row) => new Date(row.fecha).getTime(),
+    },
     { key: 'hora', label: 'Hora' },
     { key: 'tipo', label: 'Tipo' },
     { key: 'unidad', label: 'Unidad' },
@@ -84,8 +96,8 @@ export const SesionesOnlinePage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const [sesionesRes, materiasRes] = await Promise.all([
-        client.get<{ data: SesionOnline[] }>('/admin/sesiones-online'),
-        client.get<{ data: Materia[] }>('/admin/materias'),
+        client.get<{ data: SesionOnline[] }>('/admin/sesiones-online?limit=500'),
+        client.get<{ data: Materia[] }>('/admin/materias?limit=500'),
       ]);
       setSesiones(sesionesRes.data.data);
       setMaterias(materiasRes.data.data);
