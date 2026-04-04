@@ -134,8 +134,8 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({
           materia ? (notaMap.get(materia.id) || docenteMap.get(materia.id)) : undefined,
         ].filter(Boolean).join(' · ') || undefined,
         tipo: 'online',
-        badge: sesion.tipo?.toUpperCase() === 'TUTORÍA' ? 'TUTORÍA EN LÍNEA' : 'CLASE EN LÍNEA',
-        badgeColor: sesion.tipo?.toUpperCase() === 'TUTORÍA'
+        badge: sesion.tipo?.toLowerCase() === 'tutoria' ? 'TUTORÍA EN LÍNEA' : 'CLASE EN LÍNEA',
+        badgeColor: sesion.tipo?.toLowerCase() === 'tutoria'
           ? { bg: '#c6f6d5', text: '#22543d' }
           : { bg: '#bee3f8', text: '#2a4365' },
         enlace: (materia ? enlaceMap.get(materia.id) : null) || null,
