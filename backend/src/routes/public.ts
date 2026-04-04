@@ -855,10 +855,9 @@ public_routes.get("/temp-fix-ingles-jueves", async (c) => {
   try {
     const dryRun = c.req.query("apply") !== "true";
 
-    // Find all SesionOnline for Inglés in niveles 1 (2do) and 2 (4to)
-    const sesiones = await prisma.sesionOnline.findMany({
+    // First: discover what tipos and materia names exist for Inglés on Thursdays
+    const allIngles = await prisma.sesionOnline.findMany({
       where: {
-        tipo: "CLASE EN LÍNEA",
         materia: {
           nombre: { contains: "Ingl", mode: "insensitive" },
           nivelId: { in: [1, 2] },
@@ -867,29 +866,37 @@ public_routes.get("/temp-fix-ingles-jueves", async (c) => {
       include: { materia: { include: { nivel: true } } },
     });
 
-    // Filter only those whose fecha falls on Thursday (day 4)
-    const jueves = sesiones.filter((s) => {
+    // Get unique tipos
+    const tipos = [...new Set(allIngles.map((s) => s.tipo))];
+    const materias = [...new Set(allIngles.map((s) => s.materia.nombre))];
+
+    // Filter Thursdays
+    const jueves = allIngles.filter((s) => {
       const d = new Date(s.fecha);
-      return d.getUTCDay() === 4; // 0=Sun, 4=Thu
+      return d.getUTCDay() === 4;
     });
 
-    if (!dryRun && jueves.length > 0) {
+    const juevesClase = jueves.filter((s) => s.tipo !== "TUTORÍA EN LÍNEA");
+
+    if (!dryRun && juevesClase.length > 0) {
       await prisma.sesionOnline.updateMany({
-        where: { id: { in: jueves.map((s) => s.id) } },
+        where: { id: { in: juevesClase.map((s) => s.id) } },
         data: { tipo: "TUTORÍA EN LÍNEA" },
       });
     }
 
     return c.json({
       mode: dryRun ? "DRY RUN (add ?apply=true to execute)" : "APPLIED",
-      totalFound: jueves.length,
-      records: jueves.map((s) => ({
+      debug: { totalIngles: allIngles.length, tiposEncontrados: tipos, materiasEncontradas: materias },
+      totalJueves: jueves.length,
+      totalToUpdate: juevesClase.length,
+      records: juevesClase.map((s) => ({
         id: s.id,
         materia: s.materia.nombre,
         nivel: (s.materia as any).nivel?.nombre,
         fecha: s.fecha,
         dia: ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][new Date(s.fecha).getUTCDay()],
-        tipoAnterior: "CLASE EN LÍNEA",
+        tipoActual: s.tipo,
         tipoNuevo: "TUTORÍA EN LÍNEA",
         hora: s.hora,
         grupo: s.grupo,
