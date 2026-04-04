@@ -861,10 +861,10 @@ public_routes.get("/temp-fix-ingles-jueves", async (c) => {
         tipo: "CLASE EN LÍNEA",
         materia: {
           nombre: { contains: "Ingl", mode: "insensitive" },
-          nivelId: { in: [1, 2] }, // 2do nivel = id 1, 4to nivel = id 2
+          nivelId: { in: [1, 2] },
         },
       },
-      include: { materia: { include: { nivel: true, centro: true } } },
+      include: { materia: { include: { nivel: true } } },
     });
 
     // Filter only those whose fecha falls on Thursday (day 4)
@@ -887,12 +887,12 @@ public_routes.get("/temp-fix-ingles-jueves", async (c) => {
         id: s.id,
         materia: s.materia.nombre,
         nivel: (s.materia as any).nivel?.nombre,
-        centro: (s.materia as any).centro?.nombre,
         fecha: s.fecha,
         dia: ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][new Date(s.fecha).getUTCDay()],
         tipoAnterior: "CLASE EN LÍNEA",
         tipoNuevo: "TUTORÍA EN LÍNEA",
         hora: s.hora,
+        grupo: s.grupo,
       })),
     });
   } catch (error: any) {
