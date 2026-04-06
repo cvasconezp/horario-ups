@@ -57,6 +57,8 @@ export interface Asignacion {
   docenteId: number;
   enlaceVirtual: string | null;
   contrasena: string | null;
+  diaOverride: string | null;
+  horaOverride: string | null;
   materia?: Materia;
   centro?: Centro;
   docente?: Docente;

@@ -61,6 +61,8 @@ interface AsignacionFull {
   docenteId: number;
   enlaceVirtual: string | null;
   contrasena: string | null;
+  diaOverride: string | null;
+  horaOverride: string | null;
   materia: {
     id: number;
     nombre: string;
@@ -118,6 +120,10 @@ const getBloqueColor = (label: string): string => {
   return 'bg-green-100 text-green-800';
 };
 
+// Effective dia/hora considering per-asignacion overrides
+const getEffectiveDia = (asig: AsignacionFull): string | null => asig.diaOverride || asig.materia.dia;
+const getEffectiveHora = (asig: AsignacionFull): string | null => asig.horaOverride || asig.materia.hora;
+
 const getNivelShort = (numero: number): string => {
   const map: Record<number, string> = { 2: '2do nivel', 4: '4to nivel', 6: '6to nivel', 8: '8vo nivel', 9: 'Contingencia' };
   return map[numero] || `${numero}° nivel`;
@@ -131,8 +137,10 @@ const buildWhatsAppMsg = (asig: AsignacionFull): string => {
   lines.push(`*${asig.materia.nombre}* con ${asig.docente.nombre}`);
   // Line 3: Día | Hora enlace [Contraseña: "xxx"]
   const timeParts: string[] = [];
-  if (asig.materia.dia) timeParts.push(asig.materia.dia);
-  if (asig.materia.hora) timeParts.push(`| ${asig.materia.hora}`);
+  const eDia = getEffectiveDia(asig);
+  const eHora = getEffectiveHora(asig);
+  if (eDia) timeParts.push(eDia);
+  if (eHora) timeParts.push(`| ${eHora}`);
   if (asig.enlaceVirtual) timeParts.push(asig.enlaceVirtual);
   if (asig.contrasena) timeParts.push(`Contraseña: "${asig.contrasena}"`);
   if (timeParts.length > 0) lines.push(timeParts.join(' '));
@@ -229,7 +237,7 @@ export const AdminDashboard: React.FC = () => {
   const dias = useMemo(() => {
     const order = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     const set = new Set<string>();
-    asignaciones.forEach((a) => { if (a.materia.dia) set.add(a.materia.dia); });
+    asignaciones.forEach((a) => { const d = getEffectiveDia(a); if (d) set.add(d); });
     return order.filter((d) => set.has(d));
   }, [asignaciones]);
 
@@ -248,7 +256,7 @@ export const AdminDashboard: React.FC = () => {
       if (filterNivel && a.materia.nivel.numero !== parseInt(filterNivel)) return false;
       if (filterCentro && a.centro.id !== parseInt(filterCentro)) return false;
       if (filterBloques.length > 0 && !filterBloques.includes(getBloqueLabel(a))) return false;
-      if (filterDia && a.materia.dia !== filterDia) return false;
+      if (filterDia && getEffectiveDia(a) !== filterDia) return false;
       return true;
     });
   }, [asignaciones, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
@@ -265,8 +273,8 @@ export const AdminDashboard: React.FC = () => {
         case 'bloque': aVal = getBloqueLabel(a); bVal = getBloqueLabel(b); break;
         case 'asignatura': aVal = a.materia.nombre; bVal = b.materia.nombre; break;
         case 'docente': aVal = a.docente.nombre; bVal = b.docente.nombre; break;
-        case 'dia': aVal = DIAS.indexOf(a.materia.dia || ''); bVal = DIAS.indexOf(b.materia.dia || ''); break;
-        case 'hora': aVal = a.materia.hora || ''; bVal = b.materia.hora || ''; break;
+        case 'dia': aVal = DIAS.indexOf(getEffectiveDia(a) || ''); bVal = DIAS.indexOf(getEffectiveDia(b) || ''); break;
+        case 'hora': aVal = getEffectiveHora(a) || ''; bVal = getEffectiveHora(b) || ''; break;
       }
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
@@ -363,8 +371,8 @@ export const AdminDashboard: React.FC = () => {
   // === EDIT MODAL LOGIC ===
   const openEditModal = async (asig: AsignacionFull) => {
     setEditingAsig(asig);
-    setEditDia(asig.materia.dia || '');
-    setEditHora(asig.materia.hora || '');
+    setEditDia(getEffectiveDia(asig) || '');
+    setEditHora(getEffectiveHora(asig) || '');
     setEditFecha('');
     setEditEnlace(asig.enlaceVirtual || '');
     setEditContrasena(asig.contrasena || '');
@@ -415,6 +423,12 @@ export const AdminDashboard: React.FC = () => {
         });
       }
 
+      // Clear overrides on ALL asignaciones for this materia (base changed)
+      const sameMateria = asignaciones.filter((a) => a.materia.id === editingAsig.materia.id && (a.diaOverride || a.horaOverride));
+      for (const a of sameMateria) {
+        await client.patch(`/admin/asignaciones/${a.id}`, { diaOverride: null, horaOverride: null });
+      }
+
       // Track this change for undo/highlight
       setRecentChanges((prev) => [
         { materiaId: editingAsig.materia.id, prevDia, prevHora, timestamp: Date.now() },
@@ -426,11 +440,43 @@ export const AdminDashboard: React.FC = () => {
         prev.map((a) =>
           a.materia.id === editingAsig.materia.id
             ? { ...a, materia: { ...a.materia, dia: editDia || null, hora: editHora || null },
+                diaOverride: null, horaOverride: null,
                 ...(a.id === editingAsig.id ? { enlaceVirtual: editEnlace || null, contrasena: editContrasena || null } : {}) }
             : a
         )
       );
-      setSaveMsg('Todos los eventos actualizados');
+      setSaveMsg('Todos los centros actualizados');
+      setTimeout(closeEditModal, 1200);
+    } catch (err) {
+      setSaveMsg('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveThisCenter = async () => {
+    if (!editingAsig) return;
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      // Save dia/hora as overrides on THIS asignacion only
+      await client.patch(`/admin/asignaciones/${editingAsig.id}`, {
+        diaOverride: editDia || null,
+        horaOverride: editHora || null,
+        enlaceVirtual: editEnlace || null,
+        contrasena: editContrasena || null,
+      });
+
+      // Update local state
+      setAsignaciones((prev) =>
+        prev.map((a) =>
+          a.id === editingAsig.id
+            ? { ...a, diaOverride: editDia || null, horaOverride: editHora || null,
+                enlaceVirtual: editEnlace || null, contrasena: editContrasena || null }
+            : a
+        )
+      );
+      setSaveMsg(`Solo ${editingAsig.centro.nombre} actualizado`);
       setTimeout(closeEditModal, 1200);
     } catch (err) {
       setSaveMsg('Error al guardar');
@@ -622,14 +668,20 @@ export const AdminDashboard: React.FC = () => {
                         <td className="px-4 py-3 font-medium text-gray-900">{asig.materia.nombre}</td>
                         <td className="px-4 py-3 text-gray-700">{asig.docente.nombre}</td>
                         <td className="px-4 py-3 text-gray-700">
-                          {is2do && !asig.materia.dia
+                          {is2do && !getEffectiveDia(asig)
                             ? <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
-                            : asig.materia.dia || '—'}
+                            : <>
+                                {getEffectiveDia(asig) || '—'}
+                                {asig.diaOverride && <span className="ml-1 text-xs text-indigo-500" title="Día personalizado para este centro">★</span>}
+                              </>}
                         </td>
                         <td className="px-4 py-3 text-gray-700">
-                          {is2do && !asig.materia.hora
+                          {is2do && !getEffectiveHora(asig)
                             ? <span className="text-amber-600 text-xs font-medium">Por confirmar</span>
-                            : asig.materia.hora || '—'}
+                            : <>
+                                {getEffectiveHora(asig) || '—'}
+                                {asig.horaOverride && <span className="ml-1 text-xs text-indigo-500" title="Hora personalizada para este centro">★</span>}
+                              </>}
                         </td>
                         <td className="px-4 py-3">
                           {asig.enlaceVirtual ? (
@@ -736,7 +788,9 @@ export const AdminDashboard: React.FC = () => {
                 <div className="bg-gray-50 rounded-lg p-3 text-sm">
                   <p><span className="font-medium">Docente:</span> {editingAsig.docente.nombre}</p>
                   <p><span className="font-medium">Centro:</span> {editingAsig.centro.nombre}</p>
-                  <p><span className="font-medium">Actual:</span> {editingAsig.materia.dia || '—'} | {editingAsig.materia.hora || '—'}</p>
+                  <p><span className="font-medium">Actual:</span> {getEffectiveDia(editingAsig) || '—'} | {getEffectiveHora(editingAsig) || '—'}
+                    {(editingAsig.diaOverride || editingAsig.horaOverride) && <span className="text-indigo-500 text-xs ml-2">(personalizado para este centro)</span>}
+                  </p>
                 </div>
 
                 <div>
@@ -785,17 +839,27 @@ export const AdminDashboard: React.FC = () => {
 
                 <p className="text-sm font-medium text-gray-700">¿Aplicar cambio a:</p>
 
-                {/* Option 1: All events */}
+                {/* Option 1: All centers */}
                 <button onClick={handleSaveAll} disabled={saving}
                   className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition disabled:opacity-50">
-                  <p className="font-bold text-gray-900">Todos los eventos</p>
+                  <p className="font-bold text-gray-900">Todos los centros</p>
                   <p className="text-sm text-gray-600 mt-1">
-                    Cambia el horario base de la materia y actualiza TODAS las sesiones online futuras.
+                    Cambia el horario base de la materia para TODOS los centros.
                     Se refleja en la app web y en las suscripciones de calendario.
                   </p>
                 </button>
 
-                {/* Option 2: Single event */}
+                {/* Option 2: This center only */}
+                <button onClick={handleSaveThisCenter} disabled={saving}
+                  className="w-full text-left p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition disabled:opacity-50">
+                  <p className="font-bold text-gray-900">Solo este centro ({editingAsig?.centro.nombre})</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Personaliza el día/hora únicamente para <strong>{editingAsig?.centro.nombre}</strong>.
+                    Los demás centros mantienen el horario base.
+                  </p>
+                </button>
+
+                {/* Option 3: Single event */}
                 <div className="border-2 border-gray-200 rounded-lg p-4">
                   <p className="font-bold text-gray-900 mb-2">Solo un evento específico</p>
                   <p className="text-sm text-gray-600 mb-3">

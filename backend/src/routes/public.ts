@@ -175,12 +175,16 @@ public_routes.get("/horarios/:periodoId/:nivelId/:centroId", async (c) => {
     }
 
     // Transform materias to include docente and enlaceVirtual from asignaciones
+    // Apply per-asignacion dia/hora overrides if present
     const materiasConDocente = materias.map((m) => {
-      const asignacion = m.asignaciones[0];
+      const asignacion = m.asignaciones[0] as any;
       return {
         ...m,
+        dia: asignacion?.diaOverride || m.dia,
+        hora: asignacion?.horaOverride || m.hora,
         docente: asignacion?.docente || null,
         enlaceVirtual: asignacion?.enlaceVirtual || null,
+        contrasena: asignacion?.contrasena || null,
       };
     });
 

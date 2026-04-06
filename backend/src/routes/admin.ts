@@ -760,6 +760,8 @@ admin_routes.patch("/asignaciones/:id", async (c) => {
     const data: Record<string, any> = {};
     if (body.enlaceVirtual !== undefined) data.enlaceVirtual = body.enlaceVirtual;
     if (body.contrasena !== undefined) data.contrasena = body.contrasena;
+    if (body.diaOverride !== undefined) data.diaOverride = body.diaOverride;
+    if (body.horaOverride !== undefined) data.horaOverride = body.horaOverride;
 
     const asignacion = await prisma.asignacion.update({
       where: { id: parseInt(c.req.param("id")) },
@@ -1359,9 +1361,12 @@ admin_routes.get("/conflicts", async (c) => {
     >();
 
     for (const asig of asignaciones) {
-      if (!asig.materia.dia || !asig.materia.hora) continue;
+      const a = asig as any;
+      const effectiveDia = a.diaOverride || a.materia.dia;
+      const effectiveHora = a.horaOverride || a.materia.hora;
+      if (!effectiveDia || !effectiveHora) continue;
 
-      const key = `${asig.docenteId}_${asig.materia.dia}_${asig.materia.hora}`;
+      const key = `${asig.docenteId}_${effectiveDia}_${effectiveHora}`;
       if (!groupedByDocenteTimeSlot.has(key)) {
         groupedByDocenteTimeSlot.set(key, []);
       }
@@ -1399,8 +1404,8 @@ admin_routes.get("/conflicts", async (c) => {
                 centroNombre: g.centro.nombre,
                 nivelId: g.materia.nivelId,
                 nivelNumero: g.materia.nivel.numero,
-                dia: g.materia.dia ?? undefined,
-                hora: g.materia.hora ?? undefined,
+                dia: (g as any).diaOverride || g.materia.dia || undefined,
+                hora: (g as any).horaOverride || g.materia.hora || undefined,
               }))
             );
           } else {
@@ -1416,8 +1421,8 @@ admin_routes.get("/conflicts", async (c) => {
                 centroNombre: g.centro.nombre,
                 nivelId: g.materia.nivelId,
                 nivelNumero: g.materia.nivel.numero,
-                dia: g.materia.dia ?? undefined,
-                hora: g.materia.hora ?? undefined,
+                dia: (g as any).diaOverride || g.materia.dia || undefined,
+                hora: (g as any).horaOverride || g.materia.hora || undefined,
               })),
             });
           }
@@ -1604,7 +1609,7 @@ admin_routes.get("/whatsapp-export", async (c) => {
       return `*${asig.materia.nombreCorto}*
 Nivel: ${asig.materia.nivel.numero}° | Centro: ${asig.centro.nombre}
 Docente: ${asig.docente.nombre}
-Día: ${asig.materia.dia} | Hora: ${asig.materia.hora}
+Día: ${(asig as any).diaOverride || asig.materia.dia} | Hora: ${(asig as any).horaOverride || asig.materia.hora}
 Bloque: ${bimestreLabel}`;
     });
 
@@ -1757,11 +1762,11 @@ admin_routes.post("/export-excel", async (c) => {
       },
       dia: {
         header: "Día",
-        getValue: (a) => a.materia?.dia || "",
+        getValue: (a: any) => a.diaOverride || a.materia?.dia || "",
       },
       hora: {
         header: "Hora",
-        getValue: (a) => a.materia?.hora || "",
+        getValue: (a: any) => a.horaOverride || a.materia?.hora || "",
       },
       duracion: {
         header: "Duración (min)",
