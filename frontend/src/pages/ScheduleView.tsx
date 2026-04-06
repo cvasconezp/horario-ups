@@ -9,6 +9,7 @@ import { PresencialSessions } from '../components/schedule/PresencialSessions';
 import { AcademicCalendar } from '../components/schedule/AcademicCalendar';
 import { AlertCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { NotificationBanner } from '../components/NotificationBanner';
+import { trackPageView } from '../utils/tracking';
 
 export const ScheduleView: React.FC = () => {
   const { periodoId, nivelId, centroId } = useParams<{
@@ -46,6 +47,7 @@ export const ScheduleView: React.FC = () => {
           `/horarios/${periodoId}/${nivelId}/${centroId}`
         );
         setHorario(horarioResponse.data);
+        trackPageView({ pagina: 'horario', periodoId, nivelId, centroId });
 
         // Fetch online sessions (filtered by centro/bimestre)
         const onlineResponse = await client.get<SesionOnline[]>(

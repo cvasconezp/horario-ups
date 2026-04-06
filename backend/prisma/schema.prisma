@@ -177,6 +177,21 @@ model IcalSuscripcion {
   @@unique([periodoId, nivelId, centroId, tipo, docenteId])
 }
 
+model PageView {
+  id        Int      @id @default(autoincrement())
+  periodoId Int?
+  nivelId   Int?
+  centroId  Int?
+  pagina    String   // "inicio", "selector", "horario", "docente"
+  sessionId String?  // anonymous client session hash
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([pagina])
+}
+
 model Usuario {
   id           Int      @id @default(autoincrement())
   email        String   @unique

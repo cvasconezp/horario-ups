@@ -28,6 +28,7 @@ import { CalendarioPage } from './pages/admin/CalendarioPage';
 import { ImportPage } from './pages/admin/ImportPage';
 import { IcalStatsPage } from './pages/admin/IcalStatsPage';
 import { ExportPage } from './pages/admin/ExportPage';
+import { AnalyticsPage } from './pages/admin/AnalyticsPage';
 
 // Docente pages
 import { MiHorario } from './pages/docente/MiHorario';
@@ -166,6 +167,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <ExportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/analytics"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AnalyticsPage />
               </ProtectedRoute>
             }
           />

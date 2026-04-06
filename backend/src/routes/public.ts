@@ -860,4 +860,31 @@ function formatICalDateTimeAddMin(d: Date, timeStr: string, addMinutes: number):
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// ─── Page view tracking (fire-and-forget) ───
+public_routes.post("/track", async (c) => {
+  try {
+    const body = await c.req.json();
+    const ua = c.req.header("user-agent") || null;
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+               c.req.header("x-real-ip") || null;
+
+    // Fire and forget
+    (prisma as any).pageView.create({
+      data: {
+        pagina: body.pagina || "desconocido",
+        periodoId: body.periodoId ? parseInt(body.periodoId) : null,
+        nivelId: body.nivelId ? parseInt(body.nivelId) : null,
+        centroId: body.centroId ? parseInt(body.centroId) : null,
+        sessionId: body.sessionId || null,
+        userAgent: ua,
+        ip,
+      },
+    }).catch(() => {});
+
+    return c.json({ ok: true });
+  } catch {
+    return c.json({ ok: true }); // never fail
+  }
+});
+
 export default public_routes;

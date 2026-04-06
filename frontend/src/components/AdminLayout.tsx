@@ -54,6 +54,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { label: 'Importar', href: '/admin/import', icon: Upload },
       { label: 'Exportar Excel', href: '/admin/export', icon: Download },
+      { label: 'Analíticas de Uso', href: '/admin/analytics', icon: BarChart3 },
       { label: 'Suscripciones iCal', href: '/admin/ical-stats', icon: BarChart3 },
       { label: 'Portal Docente', href: '/mi-horario', icon: Users },
     ],

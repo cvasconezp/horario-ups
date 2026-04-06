@@ -1906,4 +1906,159 @@ admin_routes.post("/export-excel", async (c) => {
   }
 });
 
+// ============================================================
+// Page view analytics
+// ============================================================
+admin_routes.get("/analytics", async (c) => {
+  try {
+    const days = parseInt(c.req.query("days") || "30");
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const views: any[] = await (prisma as any).pageView.findMany({
+      where: { createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Total views
+    const totalViews = views.length;
+    // Unique sessions
+    const uniqueSessions = new Set(views.filter((v) => v.sessionId).map((v) => v.sessionId)).size;
+
+    // Views by page type
+    const byPage: Record<string, number> = {};
+    views.forEach((v) => { byPage[v.pagina] = (byPage[v.pagina] || 0) + 1; });
+
+    // Horario views by nivel
+    const horarioViews = views.filter((v) => v.pagina === "horario" && v.nivelId);
+    const byNivel: Record<number, number> = {};
+    horarioViews.forEach((v) => { byNivel[v.nivelId!] = (byNivel[v.nivelId!] || 0) + 1; });
+
+    // Horario views by centro
+    const byCentro: Record<number, number> = {};
+    horarioViews.forEach((v) => { if (v.centroId) byCentro[v.centroId] = (byCentro[v.centroId] || 0) + 1; });
+
+    // Unique sessions per nivel
+    const uniqueByNivel: Record<number, number> = {};
+    horarioViews.forEach((v) => {
+      if (!v.nivelId) return;
+      if (!uniqueByNivel[v.nivelId]) uniqueByNivel[v.nivelId] = 0;
+    });
+    for (const nivelId of Object.keys(byNivel)) {
+      const sessions = new Set(horarioViews.filter((v) => v.nivelId === parseInt(nivelId) && v.sessionId).map((v) => v.sessionId));
+      uniqueByNivel[parseInt(nivelId)] = sessions.size;
+    }
+
+    // Unique sessions per centro
+    const uniqueByCentro: Record<number, number> = {};
+    for (const centroId of Object.keys(byCentro)) {
+      const sessions = new Set(horarioViews.filter((v) => v.centroId === parseInt(centroId) && v.sessionId).map((v) => v.sessionId));
+      uniqueByCentro[parseInt(centroId)] = sessions.size;
+    }
+
+    // Views by day (for chart)
+    const byDay: Record<string, number> = {};
+    const uniqueByDay: Record<string, Set<string>> = {};
+    views.forEach((v) => {
+      const day = v.createdAt.toISOString().split("T")[0];
+      byDay[day] = (byDay[day] || 0) + 1;
+      if (v.sessionId) {
+        if (!uniqueByDay[day]) uniqueByDay[day] = new Set();
+        uniqueByDay[day].add(v.sessionId);
+      }
+    });
+    const dailyChart = Object.entries(byDay)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({
+        date,
+        views: count,
+        visitors: uniqueByDay[date]?.size || 0,
+      }));
+
+    // Device detection
+    const devices: Record<string, number> = {};
+    const uniqueAgents = new Map<string, string>(); // sessionId → userAgent
+    views.forEach((v) => {
+      if (v.sessionId && v.userAgent && !uniqueAgents.has(v.sessionId)) {
+        uniqueAgents.set(v.sessionId, v.userAgent);
+      }
+    });
+    for (const [, ua] of uniqueAgents) {
+      let device = "Otro";
+      if (/iPhone|iPad|iPod/i.test(ua)) device = "iOS";
+      else if (/Android/i.test(ua)) device = "Android";
+      else if (/Windows/i.test(ua)) device = "Windows";
+      else if (/Macintosh|Mac OS/i.test(ua)) device = "macOS";
+      else if (/Linux/i.test(ua)) device = "Linux";
+      devices[device] = (devices[device] || 0) + 1;
+    }
+
+    // Nivel/centro cross (nivel+centro → unique visitors)
+    const crossNivelCentro: Record<string, { nivelId: number; centroId: number; views: number; unique: number }> = {};
+    horarioViews.forEach((v) => {
+      if (!v.nivelId || !v.centroId) return;
+      const key = `${v.nivelId}_${v.centroId}`;
+      if (!crossNivelCentro[key]) crossNivelCentro[key] = { nivelId: v.nivelId, centroId: v.centroId, views: 0, unique: 0 };
+      crossNivelCentro[key].views++;
+    });
+    for (const key of Object.keys(crossNivelCentro)) {
+      const { nivelId, centroId } = crossNivelCentro[key];
+      const sessions = new Set(horarioViews.filter((v) => v.nivelId === nivelId && v.centroId === centroId && v.sessionId).map((v) => v.sessionId));
+      crossNivelCentro[key].unique = sessions.size;
+    }
+
+    // Enrich with names
+    const [niveles, centros] = await Promise.all([
+      prisma.nivel.findMany({ select: { id: true, numero: true, nombre: true } }),
+      prisma.centro.findMany({ select: { id: true, nombre: true, zona: true } }),
+    ]);
+    const nivelMap = new Map(niveles.map((n) => [n.id, n]));
+    const centroMap = new Map(centros.map((c) => [c.id, c]));
+
+    const nivelStats = Object.entries(byNivel)
+      .map(([id, count]) => ({
+        nivelId: parseInt(id),
+        nombre: nivelMap.get(parseInt(id))?.nombre || `Nivel ${id}`,
+        numero: nivelMap.get(parseInt(id))?.numero || 0,
+        views: count,
+        unique: uniqueByNivel[parseInt(id)] || 0,
+      }))
+      .sort((a, b) => a.numero - b.numero);
+
+    const centroStats = Object.entries(byCentro)
+      .map(([id, count]) => ({
+        centroId: parseInt(id),
+        nombre: centroMap.get(parseInt(id))?.nombre || `Centro ${id}`,
+        zona: centroMap.get(parseInt(id))?.zona || "",
+        views: count,
+        unique: uniqueByCentro[parseInt(id)] || 0,
+      }))
+      .sort((a, b) => b.unique - a.unique);
+
+    const crossStats = Object.values(crossNivelCentro)
+      .map((x) => ({
+        ...x,
+        nivelNombre: nivelMap.get(x.nivelId)?.nombre || `Nivel ${x.nivelId}`,
+        nivelNumero: nivelMap.get(x.nivelId)?.numero || 0,
+        centroNombre: centroMap.get(x.centroId)?.nombre || `Centro ${x.centroId}`,
+      }))
+      .sort((a, b) => a.nivelNumero - b.nivelNumero || a.centroNombre.localeCompare(b.centroNombre));
+
+    return c.json({
+      days,
+      totalViews,
+      uniqueSessions,
+      byPage,
+      nivelStats,
+      centroStats,
+      crossStats,
+      dailyChart,
+      devices,
+    });
+  } catch (error) {
+    console.error("[Analytics Error]", error);
+    return c.json({ error: "Failed to fetch analytics" }, 500);
+  }
+});
+
 export default admin_routes;

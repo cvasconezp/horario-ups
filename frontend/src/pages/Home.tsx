@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import client from '../api/client';
 import type { Periodo, Nivel, Centro, Carrera } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { trackPageView } from '../utils/tracking';
 import {
   AlertCircle,
   BookOpen,
@@ -37,6 +38,7 @@ export const Home: React.FC = () => {
         setIsLoading(true);
         const response = await client.get<ActiveResponse>('/activo');
         setData(response.data);
+        trackPageView({ pagina: 'inicio', periodoId: response.data.periodo?.id });
       } catch {
         setError('No se pudo cargar la información del período activo');
       } finally {
