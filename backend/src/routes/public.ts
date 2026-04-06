@@ -297,7 +297,65 @@ public_routes.get("/sesiones-online", async (c) => {
         return true;
       });
 
-      return c.json(filtered);
+      // Step 3: Apply diaOverride / horaOverride from Asignacion
+      // When a centro has per-center overrides, shift session fecha/hora accordingly
+      const asignaciones = await prisma.asignacion.findMany({
+        where: {
+          centroId: cId,
+          materia: {
+            periodoId: parseInt(periodoId),
+            nivelId: parseInt(nivelId),
+          },
+        },
+        include: { materia: true },
+      });
+
+      // Build a map of materiaId → { diaOverride, horaOverride, originalDia }
+      const overrideMap = new Map<number, { diaOverride: string | null; horaOverride: string | null; originalDia: string }>();
+      asignaciones.forEach((a: any) => {
+        if (a.diaOverride || a.horaOverride) {
+          overrideMap.set(a.materiaId, {
+            diaOverride: a.diaOverride || null,
+            horaOverride: a.horaOverride || null,
+            originalDia: a.materia.dia,
+          });
+        }
+      });
+
+      // Day-of-week mapping (JS Date: 0=Sunday, 1=Monday, ...)
+      const diaToNumber: Record<string, number> = {
+        Domingo: 0, Lunes: 1, Martes: 2, Miércoles: 3, "Miercoles": 3,
+        Jueves: 4, Viernes: 5, Sábado: 6, "Sabado": 6,
+      };
+
+      const adjusted = filtered.map((s) => {
+        const override = overrideMap.get(s.materiaId);
+        if (!override) return s;
+
+        let adjustedFecha = s.fecha;
+        let adjustedHora = s.hora;
+
+        // Shift fecha to the overridden day of week
+        if (override.diaOverride) {
+          const originalDayNum = diaToNumber[override.originalDia];
+          const newDayNum = diaToNumber[override.diaOverride];
+          if (originalDayNum !== undefined && newDayNum !== undefined) {
+            const diff = newDayNum - originalDayNum;
+            const d = new Date(s.fecha);
+            d.setDate(d.getDate() + diff);
+            adjustedFecha = d;
+          }
+        }
+
+        // Replace hora with the overridden hora
+        if (override.horaOverride) {
+          adjustedHora = override.horaOverride;
+        }
+
+        return { ...s, fecha: adjustedFecha, hora: adjustedHora };
+      });
+
+      return c.json(adjusted);
     }
 
     return c.json(sesiones);
@@ -695,6 +753,57 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
       return true;
     });
 
+    // --- Apply diaOverride / horaOverride from Asignacion ---
+    const icalAsignaciones = await prisma.asignacion.findMany({
+      where: {
+        centroId: cId,
+        materia: { periodoId: pId, nivelId: nId },
+      },
+      include: { materia: true },
+    });
+
+    const icalOverrideMap = new Map<number, { diaOverride: string | null; horaOverride: string | null; originalDia: string }>();
+    icalAsignaciones.forEach((a: any) => {
+      if (a.diaOverride || a.horaOverride) {
+        icalOverrideMap.set(a.materiaId, {
+          diaOverride: a.diaOverride || null,
+          horaOverride: a.horaOverride || null,
+          originalDia: a.materia.dia,
+        });
+      }
+    });
+
+    const icalDiaToNumber: Record<string, number> = {
+      Domingo: 0, Lunes: 1, Martes: 2, Miércoles: 3, "Miercoles": 3,
+      Jueves: 4, Viernes: 5, Sábado: 6, "Sabado": 6,
+    };
+
+    // Adjust sessions with overrides
+    const adjustedSesionesOnline = sesionesOnline.map((s) => {
+      const override = icalOverrideMap.get(s.materiaId);
+      if (!override) return s;
+
+      let adjustedFecha = s.fecha;
+      let adjustedHora = s.hora;
+
+      if (override.diaOverride) {
+        const originalDayNum = icalDiaToNumber[override.originalDia];
+        const newDayNum = icalDiaToNumber[override.diaOverride];
+        if (originalDayNum !== undefined && newDayNum !== undefined) {
+          const diff = newDayNum - originalDayNum;
+          const d = new Date(s.fecha);
+          d.setDate(d.getDate() + diff);
+          adjustedFecha = d;
+        }
+      }
+
+      if (override.horaOverride) {
+        adjustedHora = override.horaOverride;
+      }
+
+      return { ...s, fecha: adjustedFecha, hora: adjustedHora };
+    });
+
     // --- Filter calendario events by nivelId ---
     const eventos = allEventos.filter((e) => e.nivelId === null || e.nivelId === nId);
 
@@ -722,7 +831,7 @@ public_routes.get("/ical/:periodoId/:nivelId/:centroId", async (c) => {
     ];
 
     // Online sessions as events (tutorías: 60min, clases: materia duration or 90min)
-    for (const s of sesionesOnline) {
+    for (const s of adjustedSesionesOnline) {
       const dtStart = formatICalDateTime(s.fecha, s.hora);
       const durMin = s.tipo === "tutoria" ? 60 : (s.materia.duracion || 90);
       const dtEnd = formatICalDateTimeAddMin(s.fecha, s.hora, durMin);
