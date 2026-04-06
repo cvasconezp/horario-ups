@@ -79,8 +79,6 @@ export const AnalyticsPage: React.FC = () => {
   }, [days]);
 
   // Max values for bar sizing
-  const maxNivelUnique = useMemo(() => data ? Math.max(...data.nivelStats.map((n) => n.unique), 1) : 1, [data]);
-  const maxCentroUnique = useMemo(() => data ? Math.max(...data.centroStats.map((c) => c.unique), 1) : 1, [data]);
   const maxDaily = useMemo(() => data ? Math.max(...data.dailyChart.map((d) => d.views), 1) : 1, [data]);
   const maxCrossUnique = useMemo(() => data ? Math.max(...data.crossStats.map((c) => c.unique), 1) : 1, [data]);
 

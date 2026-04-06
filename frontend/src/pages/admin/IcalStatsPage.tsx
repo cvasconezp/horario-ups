@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import client from '../../api/client';
 import { AdminLayout } from '../../components/AdminLayout';
-import { BarChart3, RefreshCw, Calendar, Users, MapPin, Info, ArrowUpDown } from 'lucide-react';
+import { BarChart3, RefreshCw, Users, MapPin, Info, ArrowUpDown } from 'lucide-react';
 
 interface IcalSuscripcion {
   id: number;
@@ -46,20 +46,6 @@ export const IcalStatsPage: React.FC = () => {
   useEffect(() => {
     fetchStats();
   }, []);
-
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleString('es-EC', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
 
   const formatDateShort = (dateStr: string) => {
     try {
