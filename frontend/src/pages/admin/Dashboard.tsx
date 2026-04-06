@@ -21,6 +21,7 @@ interface AsignacionFull {
   centroId: number;
   docenteId: number;
   enlaceVirtual: string | null;
+  contrasena: string | null;
   materia: {
     id: number;
     nombre: string;
@@ -78,12 +79,25 @@ const getBloqueColor = (label: string): string => {
   return 'bg-green-100 text-green-800';
 };
 
+const getNivelShort = (numero: number): string => {
+  const map: Record<number, string> = { 2: '2do nivel', 4: '4to nivel', 6: '6to nivel', 8: '8vo nivel', 9: 'Contingencia' };
+  return map[numero] || `${numero}° nivel`;
+};
+
 const buildWhatsAppMsg = (asig: AsignacionFull): string => {
-  const parts = [`*${asig.materia.nombre}*`, `con ${asig.docente.nombre}`];
-  if (asig.materia.dia) parts.push(asig.materia.dia);
-  if (asig.materia.hora) parts.push(`| ${asig.materia.hora}`);
-  if (asig.enlaceVirtual) parts.push(asig.enlaceVirtual);
-  return parts.join(' ');
+  const lines: string[] = [];
+  // Line 1: "2do nivel - Cayambe"
+  lines.push(`"${getNivelShort(asig.materia.nivel.numero)} - ${asig.centro.nombre}"`);
+  // Line 2: *Asignatura* con Docente
+  lines.push(`*${asig.materia.nombre}* con ${asig.docente.nombre}`);
+  // Line 3: Día | Hora enlace [Contraseña: "xxx"]
+  const timeParts: string[] = [];
+  if (asig.materia.dia) timeParts.push(asig.materia.dia);
+  if (asig.materia.hora) timeParts.push(`| ${asig.materia.hora}`);
+  if (asig.enlaceVirtual) timeParts.push(asig.enlaceVirtual);
+  if (asig.contrasena) timeParts.push(`Contraseña: "${asig.contrasena}"`);
+  if (timeParts.length > 0) lines.push(timeParts.join(' '));
+  return lines.join('\n');
 };
 
 const formatSessionDate = (dateStr: string): string => {
@@ -117,6 +131,7 @@ export const AdminDashboard: React.FC = () => {
   const [editHora, setEditHora] = useState('');
   const [editFecha, setEditFecha] = useState(''); // for single session date override
   const [editEnlace, setEditEnlace] = useState('');
+  const [editContrasena, setEditContrasena] = useState('');
   const [editStep, setEditStep] = useState<'form' | 'choose'>('form');
   const [upcomingSesiones, setUpcomingSesiones] = useState<UpcomingSesion[]>([]);
   const [selectedSesionId, setSelectedSesionId] = useState<number | null>(null);
@@ -253,6 +268,7 @@ export const AdminDashboard: React.FC = () => {
     setEditHora(asig.materia.hora || '');
     setEditFecha('');
     setEditEnlace(asig.enlaceVirtual || '');
+    setEditContrasena(asig.contrasena || '');
     setEditStep('form');
     setSaveMsg('');
     setSelectedSesionId(null);
@@ -290,10 +306,13 @@ export const AdminDashboard: React.FC = () => {
         hora: editHora || null,
       });
 
-      // Save enlace on the asignacion if changed
-      if (editEnlace !== (editingAsig.enlaceVirtual || '')) {
+      // Save enlace + contrasena on the asignacion if changed
+      const enlaceChanged = editEnlace !== (editingAsig.enlaceVirtual || '');
+      const contrasenaChanged = editContrasena !== (editingAsig.contrasena || '');
+      if (enlaceChanged || contrasenaChanged) {
         await client.patch(`/admin/asignaciones/${editingAsig.id}`, {
           enlaceVirtual: editEnlace || null,
+          contrasena: editContrasena || null,
         });
       }
 
@@ -308,7 +327,7 @@ export const AdminDashboard: React.FC = () => {
         prev.map((a) =>
           a.materia.id === editingAsig.materia.id
             ? { ...a, materia: { ...a.materia, dia: editDia || null, hora: editHora || null },
-                ...(a.id === editingAsig.id ? { enlaceVirtual: editEnlace || null } : {}) }
+                ...(a.id === editingAsig.id ? { enlaceVirtual: editEnlace || null, contrasena: editContrasena || null } : {}) }
             : a
         )
       );
@@ -635,6 +654,13 @@ export const AdminDashboard: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Enlace (Zoom, Meet, etc.)</label>
                   <input type="url" value={editEnlace} onChange={(e) => setEditEnlace(e.target.value)}
                     placeholder="https://zoom.us/j/123456"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña (opcional)</label>
+                  <input type="text" value={editContrasena} onChange={(e) => setEditContrasena(e.target.value)}
+                    placeholder="Contraseña de la sala"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
 

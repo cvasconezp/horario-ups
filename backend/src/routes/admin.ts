@@ -753,12 +753,13 @@ admin_routes.get("/materias/:id/sesiones-upcoming", async (c) => {
   }
 });
 
-// Quick partial update for asignacion enlace virtual
+// Quick partial update for asignacion enlace virtual + contrasena
 admin_routes.patch("/asignaciones/:id", async (c) => {
   try {
     const body = await c.req.json();
     const data: Record<string, any> = {};
     if (body.enlaceVirtual !== undefined) data.enlaceVirtual = body.enlaceVirtual;
+    if (body.contrasena !== undefined) data.contrasena = body.contrasena;
 
     const asignacion = await prisma.asignacion.update({
       where: { id: parseInt(c.req.param("id")) },
@@ -869,6 +870,7 @@ admin_routes.post("/asignaciones", async (c) => {
         centroId: body.centroId,
         docenteId: body.docenteId,
         enlaceVirtual: body.enlaceVirtual || null,
+        contrasena: body.contrasena || null,
       },
     });
     return c.json(asignacion, 201);
@@ -887,6 +889,7 @@ admin_routes.put("/asignaciones/:id", async (c) => {
         centroId: body.centroId,
         docenteId: body.docenteId,
         enlaceVirtual: body.enlaceVirtual,
+        contrasena: body.contrasena,
       },
     });
     return c.json(asignacion);
@@ -1787,6 +1790,10 @@ admin_routes.post("/export-excel", async (c) => {
       nota: {
         header: "Nota",
         getValue: (a) => a.materia?.nota || "",
+      },
+      contrasena: {
+        header: "Contraseña",
+        getValue: (a) => a.contrasena || "",
       },
     };
 

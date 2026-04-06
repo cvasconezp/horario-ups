@@ -105,6 +105,7 @@ model Asignacion {
   docenteId    Int
   docente      Docente   @relation(fields: [docenteId], references: [id], onDelete: Cascade)
   enlaceVirtual String?
+  contrasena    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

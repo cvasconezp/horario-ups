@@ -45,6 +45,7 @@ const COLUMN_OPTIONS: ColumnOption[] = [
   // Otros
   { key: 'periodo', label: 'Período', description: 'Período académico', group: 'Otros' },
   { key: 'enlaceVirtual', label: 'Enlace Virtual', description: 'Link de la sesión virtual', group: 'Otros' },
+  { key: 'contrasena', label: 'Contraseña', description: 'Contraseña de la sala virtual', group: 'Otros' },
 ];
 
 const GROUPS = [...new Set(COLUMN_OPTIONS.map((c) => c.group))];
