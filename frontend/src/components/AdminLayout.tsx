@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LogOut, Menu, X, Home, BookOpen, Users, Calendar, Upload, BarChart3,
   ChevronDown, ChevronRight, PanelLeftClose, PanelLeft, Settings, Database,
+  Download,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -52,6 +53,7 @@ const menuGroups: MenuGroup[] = [
     icon: Settings,
     items: [
       { label: 'Importar', href: '/admin/import', icon: Upload },
+      { label: 'Exportar Excel', href: '/admin/export', icon: Download },
       { label: 'Suscripciones iCal', href: '/admin/ical-stats', icon: BarChart3 },
       { label: 'Portal Docente', href: '/mi-horario', icon: Users },
     ],

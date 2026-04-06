@@ -10,6 +10,7 @@ import {
   importDocentes,
   importMaterias,
 } from "../lib/excel-import.js";
+import * as XLSX from "xlsx";
 
 const admin_routes = new Hono();
 
@@ -1667,6 +1668,229 @@ admin_routes.get("/ical-stats", async (c) => {
   } catch (error) {
     console.error("[iCal Stats Error]", error);
     return c.json({ error: "Failed to fetch iCal stats" }, 500);
+  }
+});
+
+// ==================== EXPORT EXCEL ====================
+admin_routes.post("/export-excel", async (c) => {
+  try {
+    const body = await c.req.json();
+    const columns: string[] = body.columns || [];
+    const periodoId: number | undefined = body.periodoId;
+
+    if (!columns.length) {
+      return c.json({ error: "No columns selected" }, 400);
+    }
+
+    // Fetch all asignaciones with full relations
+    const whereClause: any = {};
+    if (periodoId) {
+      whereClause.materia = { periodoId };
+    }
+
+    const asignaciones = await prisma.asignacion.findMany({
+      where: whereClause,
+      include: {
+        materia: {
+          include: {
+            nivel: {
+              include: { carrera: true },
+            },
+            periodo: true,
+            sesionesOnline: true,
+          },
+        },
+        docente: true,
+        centro: true,
+      },
+      orderBy: [
+        { docente: { nombre: "asc" } },
+        { materia: { nivel: { numero: "asc" } } },
+        { centro: { nombre: "asc" } },
+      ],
+    });
+
+    // Column mapping definitions
+    const columnDefs: Record<string, { header: string; getValue: (a: any) => any }> = {
+      docenteNombre: {
+        header: "Docente",
+        getValue: (a) => a.docente?.nombre || "",
+      },
+      docenteEmail: {
+        header: "Correo Docente",
+        getValue: (a) => a.docente?.email || "",
+      },
+      asignatura: {
+        header: "Asignatura",
+        getValue: (a) => a.materia?.nombre || "",
+      },
+      asignaturaCorto: {
+        header: "Asignatura (Corto)",
+        getValue: (a) => a.materia?.nombreCorto || "",
+      },
+      nivel: {
+        header: "Nivel",
+        getValue: (a) => a.materia?.nivel?.nombre || "",
+      },
+      nivelNumero: {
+        header: "Nivel #",
+        getValue: (a) => a.materia?.nivel?.numero || "",
+      },
+      carrera: {
+        header: "Carrera",
+        getValue: (a) => a.materia?.nivel?.carrera?.nombre || "",
+      },
+      centro: {
+        header: "Centro (Grupo)",
+        getValue: (a) => a.centro?.nombre || "",
+      },
+      zona: {
+        header: "Zona",
+        getValue: (a) => a.centro?.zona || "",
+      },
+      tipo: {
+        header: "Tipo Materia",
+        getValue: (a) => a.materia?.tipo || "",
+      },
+      dia: {
+        header: "Día",
+        getValue: (a) => a.materia?.dia || "",
+      },
+      hora: {
+        header: "Hora",
+        getValue: (a) => a.materia?.hora || "",
+      },
+      duracion: {
+        header: "Duración (min)",
+        getValue: (a) => a.materia?.duracion || "",
+      },
+      bimestreOC: {
+        header: "Bimestre OC",
+        getValue: (a) => a.materia?.bimestreOC ?? "",
+      },
+      bimestreRL: {
+        header: "Bimestre RL",
+        getValue: (a) => a.materia?.bimestreRL ?? "",
+      },
+      periodo: {
+        header: "Período",
+        getValue: (a) => a.materia?.periodo?.label || "",
+      },
+      enlaceVirtual: {
+        header: "Enlace Virtual",
+        getValue: (a) => a.enlaceVirtual || "",
+      },
+      tutoria: {
+        header: "Tutoría",
+        getValue: (a) => a.materia?.tutoria || "",
+      },
+      nota: {
+        header: "Nota",
+        getValue: (a) => a.materia?.nota || "",
+      },
+    };
+
+    // Build rows
+    const selectedDefs = columns
+      .filter((col) => columnDefs[col])
+      .map((col) => columnDefs[col]);
+
+    const headers = selectedDefs.map((d) => d.header);
+    const rows = asignaciones.map((a) => selectedDefs.map((d) => d.getValue(a)));
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Raw data
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Auto-width columns
+    const colWidths = headers.map((h, i) => {
+      const maxLen = Math.max(
+        h.length,
+        ...rows.map((r) => String(r[i] || "").length)
+      );
+      return { wch: Math.min(maxLen + 2, 50) };
+    });
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Asignaciones");
+
+    // Sheet 2: Cross-reference summary (Docente → Asignaturas × Centros)
+    if (
+      columns.includes("docenteNombre") &&
+      (columns.includes("asignatura") || columns.includes("centro"))
+    ) {
+      const docenteMap = new Map<
+        string,
+        {
+          email: string;
+          materias: Map<string, { niveles: Set<string>; centros: Set<string> }>;
+        }
+      >();
+
+      for (const a of asignaciones) {
+        const dName = a.docente?.nombre || "Sin docente";
+        const dEmail = a.docente?.email || "";
+        const mName = a.materia?.nombre || "";
+        const nName = a.materia?.nivel?.nombre || "";
+        const cName = a.centro?.nombre || "";
+
+        if (!docenteMap.has(dName)) {
+          docenteMap.set(dName, { email: dEmail, materias: new Map() });
+        }
+        const docEntry = docenteMap.get(dName)!;
+        if (!docEntry.materias.has(mName)) {
+          docEntry.materias.set(mName, { niveles: new Set(), centros: new Set() });
+        }
+        const mEntry = docEntry.materias.get(mName)!;
+        if (nName) mEntry.niveles.add(nName);
+        if (cName) mEntry.centros.add(cName);
+      }
+
+      const crossRows: any[][] = [
+        ["Docente", "Correo", "Asignatura", "Nivel(es)", "Centro(s) / Grupo(s)"],
+      ];
+
+      for (const [docName, docData] of docenteMap) {
+        for (const [matName, matData] of docData.materias) {
+          crossRows.push([
+            docName,
+            docData.email,
+            matName,
+            Array.from(matData.niveles).join(", "),
+            Array.from(matData.centros).join(", "),
+          ]);
+        }
+      }
+
+      const wsCross = XLSX.utils.aoa_to_sheet(crossRows);
+      const crossWidths = crossRows[0].map((_: any, i: number) => {
+        const maxLen = Math.max(
+          ...crossRows.map((r) => String(r[i] || "").length)
+        );
+        return { wch: Math.min(maxLen + 2, 60) };
+      });
+      wsCross["!cols"] = crossWidths;
+      XLSX.utils.book_append_sheet(wb, wsCross, "Cruce Docente-Asignaturas");
+    }
+
+    // Generate buffer
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition":
+          'attachment; filename="exportacion_horarios.xlsx"',
+      },
+    });
+  } catch (error) {
+    console.error("[Export Excel Error]", error);
+    return c.json({ error: "Failed to export Excel" }, 500);
   }
 });
 
