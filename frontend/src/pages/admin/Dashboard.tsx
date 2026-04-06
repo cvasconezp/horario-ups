@@ -13,7 +13,46 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
+  FileSpreadsheet,
+  CheckSquare,
+  Square,
+  Loader2,
+  Info,
 } from 'lucide-react';
+import type { Periodo } from '../../types';
+
+/* ─── Export column definitions ─── */
+interface ColumnOption {
+  key: string;
+  label: string;
+  description: string;
+  group: string;
+}
+
+const EXPORT_COLUMNS: ColumnOption[] = [
+  { key: 'docenteNombre', label: 'Nombre del Docente', description: 'Nombre completo', group: 'Docente' },
+  { key: 'docenteEmail', label: 'Correo del Docente', description: 'Email', group: 'Docente' },
+  { key: 'asignatura', label: 'Asignatura', description: 'Nombre completo', group: 'Asignatura' },
+  { key: 'asignaturaCorto', label: 'Asignatura (Corto)', description: 'Nombre abreviado', group: 'Asignatura' },
+  { key: 'tipo', label: 'Tipo de Materia', description: 'Tipo', group: 'Asignatura' },
+  { key: 'tutoria', label: 'Tutoría', description: 'Info de tutoría', group: 'Asignatura' },
+  { key: 'nota', label: 'Nota', description: 'Notas adicionales', group: 'Asignatura' },
+  { key: 'nivel', label: 'Nivel', description: 'Nombre del nivel', group: 'Nivel / Carrera' },
+  { key: 'nivelNumero', label: 'Nivel #', description: 'Número del nivel', group: 'Nivel / Carrera' },
+  { key: 'carrera', label: 'Carrera', description: 'Nombre de la carrera', group: 'Nivel / Carrera' },
+  { key: 'centro', label: 'Centro (Grupo)', description: 'Centro / grupo', group: 'Centro / Grupo' },
+  { key: 'zona', label: 'Zona', description: 'OC, RL, AN, WK', group: 'Centro / Grupo' },
+  { key: 'dia', label: 'Día', description: 'Día de sesión online', group: 'Horario' },
+  { key: 'hora', label: 'Hora', description: 'Hora de sesión online', group: 'Horario' },
+  { key: 'duracion', label: 'Duración (min)', description: 'Duración en minutos', group: 'Horario' },
+  { key: 'bimestreOC', label: 'Bimestre OC', description: 'Bimestre zona OC', group: 'Bimestres' },
+  { key: 'bimestreRL', label: 'Bimestre RL', description: 'Bimestre zona RL', group: 'Bimestres' },
+  { key: 'periodo', label: 'Período', description: 'Período académico', group: 'Otros' },
+  { key: 'enlaceVirtual', label: 'Enlace Virtual', description: 'Link de la sesión', group: 'Otros' },
+  { key: 'contrasena', label: 'Contraseña', description: 'Contraseña de sala', group: 'Otros' },
+];
+const EXPORT_GROUPS = [...new Set(EXPORT_COLUMNS.map((c) => c.group))];
+const DEFAULT_EXPORT_COLS = ['docenteNombre', 'docenteEmail', 'asignatura', 'nivel', 'centro'];
 
 interface AsignacionFull {
   id: number;
@@ -111,6 +150,14 @@ export const AdminDashboard: React.FC = () => {
   const [asignaciones, setAsignaciones] = useState<AsignacionFull[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Export modal state ───
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCols, setExportCols] = useState<Set<string>>(new Set(DEFAULT_EXPORT_COLS));
+  const [exportPeriodos, setExportPeriodos] = useState<Periodo[]>([]);
+  const [exportSelectedPeriodo, setExportSelectedPeriodo] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Filters
   const [searchText, setSearchText] = useState('');
@@ -258,6 +305,58 @@ export const AdminDashboard: React.FC = () => {
       console.error(err);
     } finally {
       setConflictsLoading(false);
+    }
+  };
+
+  // ─── Export modal helpers ───
+  useEffect(() => {
+    if (!showExportModal) return;
+    const fetchPeriodos = async () => {
+      try {
+        const res = await client.get('/admin/periodos', { params: { limit: 100 } });
+        const data = res.data.data || res.data;
+        setExportPeriodos(Array.isArray(data) ? data : []);
+      } catch { /* optional filter */ }
+    };
+    fetchPeriodos();
+  }, [showExportModal]);
+
+  const toggleExportCol = (key: string) => {
+    setExportCols((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  };
+  const toggleExportGroup = (group: string) => {
+    const keys = EXPORT_COLUMNS.filter((c) => c.group === group).map((c) => c.key);
+    const all = keys.every((k) => exportCols.has(k));
+    setExportCols((prev) => { const n = new Set(prev); keys.forEach((k) => all ? n.delete(k) : n.add(k)); return n; });
+  };
+  const isExportGroupSelected = (g: string) => EXPORT_COLUMNS.filter((c) => c.group === g).every((c) => exportCols.has(c.key));
+  const isExportGroupPartial = (g: string) => {
+    const keys = EXPORT_COLUMNS.filter((c) => c.group === g).map((c) => c.key);
+    const cnt = keys.filter((k) => exportCols.has(k)).length;
+    return cnt > 0 && cnt < keys.length;
+  };
+
+  const handleExport = async () => {
+    if (exportCols.size === 0) { setExportError('Selecciona al menos una columna.'); return; }
+    try {
+      setIsExporting(true);
+      setExportError(null);
+      const payload: any = { columns: Array.from(exportCols) };
+      if (exportSelectedPeriodo) payload.periodoId = parseInt(exportSelectedPeriodo);
+      const response = await client.post('/admin/export-excel', payload, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'exportacion_horarios.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Error al exportar.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -452,6 +551,11 @@ export const AdminDashboard: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium whitespace-nowrap">
               {copiedAll ? <Check size={16} /> : <Copy size={16} />}
               {copiedAll ? 'Copiado!' : 'Copiar filtrados'}
+            </button>
+            <button onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium whitespace-nowrap">
+              <FileSpreadsheet size={16} />
+              Exportar Excel
             </button>
             {recentChanges.length > 0 && (
               <button onClick={handleUndo}
@@ -762,6 +866,118 @@ export const AdminDashboard: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ===== EXPORT MODAL ===== */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <FileSpreadsheet size={20} className="text-emerald-600" />
+                  Exportar Datos a Excel
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">Selecciona las columnas a incluir en el archivo.</p>
+              </div>
+              <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-2 text-xs text-blue-800">
+                <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <span>El archivo incluye dos hojas: <strong>Asignaciones</strong> (detalle) y <strong>Cruce Docente-Asignaturas</strong> (resumen agrupado).</span>
+              </div>
+
+              {/* Period filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Período (opcional)</label>
+                <select value={exportSelectedPeriodo} onChange={(e) => setExportSelectedPeriodo(e.target.value)}
+                  className="w-full md:w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                  <option value="">Todos los períodos</option>
+                  {exportPeriodos.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </div>
+
+              {/* Column selection */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-800">Columnas a Exportar</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))}
+                      className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 font-medium">Todas</button>
+                    <button onClick={() => setExportCols(new Set())}
+                      className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium">Limpiar</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                  {EXPORT_GROUPS.map((group) => {
+                    const cols = EXPORT_COLUMNS.filter((c) => c.group === group);
+                    const allSel = isExportGroupSelected(group);
+                    const partial = isExportGroupPartial(group);
+                    return (
+                      <div key={group} className="border border-gray-200 rounded-lg">
+                        <button onClick={() => toggleExportGroup(group)}
+                          className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition rounded-t-lg text-sm">
+                          {allSel ? <CheckSquare size={16} className="text-blue-600" /> :
+                           partial ? <div className="w-4 h-4 border-2 border-blue-400 rounded bg-blue-100 flex items-center justify-center"><div className="w-2 h-0.5 bg-blue-500 rounded" /></div> :
+                           <Square size={16} className="text-gray-400" />}
+                          <span className="font-semibold text-gray-800">{group}</span>
+                          <span className="text-xs text-gray-500 ml-auto">
+                            {cols.filter((c) => exportCols.has(c.key)).length}/{cols.length}
+                          </span>
+                        </button>
+                        <div className="px-3 py-1.5 space-y-0.5">
+                          {cols.map((col) => (
+                            <label key={col.key} className="flex items-center gap-2 py-1 px-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                              <input type="checkbox" checked={exportCols.has(col.key)}
+                                onChange={() => toggleExportCol(col.key)}
+                                className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                              <span className="text-gray-800 font-medium">{col.label}</span>
+                              <span className="text-xs text-gray-400">— {col.description}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+                <span className="font-semibold">{exportCols.size}</span> columna{exportCols.size !== 1 ? 's' : ''} seleccionada{exportCols.size !== 1 ? 's' : ''}
+                {exportSelectedPeriodo
+                  ? ` — Período: ${exportPeriodos.find((p) => p.id === parseInt(exportSelectedPeriodo))?.label || exportSelectedPeriodo}`
+                  : ' — Todos los períodos'}
+              </div>
+
+              {/* Error */}
+              {exportError && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+                  <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+                  {exportError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setShowExportModal(false)}
+                  className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                  Cancelar
+                </button>
+                <button onClick={handleExport} disabled={isExporting || exportCols.size === 0}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md text-sm">
+                  {isExporting ? <><Loader2 size={16} className="animate-spin" /> Exportando...</> : <><FileSpreadsheet size={16} /> Exportar</>}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
