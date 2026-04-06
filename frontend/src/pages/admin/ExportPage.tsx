@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import client from '../../api/client';
 import {
-  Download,
   FileSpreadsheet,
   CheckSquare,
   Square,
