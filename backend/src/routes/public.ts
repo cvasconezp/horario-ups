@@ -860,6 +860,30 @@ function formatICalDateTimeAddMin(d: Date, timeStr: string, addMinutes: number):
   return `${y}${mo}${day}T${h}${mi}00`;
 }
 
+// ─── Temp: force-create PageView table if missing ───
+public_routes.get("/fix-pageview", async (c) => {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "PageView" (
+        "id" SERIAL PRIMARY KEY,
+        "periodoId" INTEGER,
+        "nivelId" INTEGER,
+        "centroId" INTEGER,
+        "pagina" TEXT NOT NULL,
+        "sessionId" TEXT,
+        "userAgent" TEXT,
+        "ip" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PageView_createdAt_idx" ON "PageView"("createdAt")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PageView_pagina_idx" ON "PageView"("pagina")`);
+    return c.json({ ok: true, message: "PageView table created/verified" });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // ─── Page view tracking (fire-and-forget) ───
 public_routes.post("/track", async (c) => {
   try {
