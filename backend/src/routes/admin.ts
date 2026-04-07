@@ -1909,11 +1909,21 @@ admin_routes.post("/export-excel", async (c) => {
 // ============================================================
 // Page view analytics
 // ============================================================
+// Helper: convert a UTC Date to Ecuador time string (YYYY-MM-DD)
+const toEcuadorDate = (d: Date): string => {
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Guayaquil" }); // en-CA gives YYYY-MM-DD
+};
+
 admin_routes.get("/analytics", async (c) => {
   try {
     const days = parseInt(c.req.query("days") || "30");
-    const since = new Date();
+    // Calculate "since" in Ecuador timezone
+    const nowEC = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Guayaquil" }));
+    const since = new Date(nowEC);
     since.setDate(since.getDate() - days);
+    since.setHours(0, 0, 0, 0);
+    // Convert back to UTC for the query (Ecuador is UTC-5)
+    since.setHours(since.getHours() + 5);
 
     const views: any[] = await (prisma as any).pageView.findMany({
       where: { createdAt: { gte: since } },
@@ -1956,11 +1966,11 @@ admin_routes.get("/analytics", async (c) => {
       uniqueByCentro[parseInt(centroId)] = sessions.size;
     }
 
-    // Views by day (for chart)
+    // Views by day (for chart) — grouped by Ecuador timezone
     const byDay: Record<string, number> = {};
     const uniqueByDay: Record<string, Set<string>> = {};
     views.forEach((v) => {
-      const day = v.createdAt.toISOString().split("T")[0];
+      const day = toEcuadorDate(v.createdAt);
       byDay[day] = (byDay[day] || 0) + 1;
       if (v.sessionId) {
         if (!uniqueByDay[day]) uniqueByDay[day] = new Set();
