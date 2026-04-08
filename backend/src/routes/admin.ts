@@ -10,6 +10,7 @@ import {
   importDocentes,
   importMaterias,
 } from "../lib/excel-import.js";
+import { isScheduleFile, parseScheduleFile, importScheduleSessions } from "../lib/schedule-import.js";
 import * as XLSX from "xlsx";
 
 const admin_routes = new Hono();
@@ -1302,21 +1303,62 @@ admin_routes.post("/import-excel", async (c) => {
       return c.json({ error: "No file provided" }, 400);
     }
 
-    const buffer = await file.arrayBuffer();
-    const parsed = parseExcelFile(Buffer.from(buffer));
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const results = {
-      carreras: await importCarreras(parsed.carreras),
-      periodos: await importPeriodos(parsed.periodos),
-      niveles: await importNiveles(parsed.niveles),
-      centros: await importCentros(parsed.centros),
-      docentes: await importDocentes(parsed.docentes),
-      materias: await importMaterias(parsed.materias),
-    };
+    // Auto-detect file format by inspecting sheet names
+    const workbook = XLSX.read(buffer, { type: "buffer" });
 
-    return c.json(results);
+    if (isScheduleFile(workbook.SheetNames)) {
+      // Schedule file (e.g., "Riobamba - II Nivel Ajuste")
+      // Extract periodo number from sheet content
+      let periodoNumero = 0;
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+        for (const row of rows.slice(0, 5)) {
+          const cell = String(row?.[0] || "");
+          const match = cell.match(/Periodo\s+(\d+)/i);
+          if (match) {
+            periodoNumero = parseInt(match[1]);
+            break;
+          }
+        }
+        if (periodoNumero) break;
+      }
+
+      if (!periodoNumero) {
+        return c.json({ error: "No se pudo detectar el número de periodo en el archivo" }, 400);
+      }
+
+      const sessions = parseScheduleFile(buffer);
+      const results = await importScheduleSessions(sessions, periodoNumero);
+
+      return c.json({
+        type: "schedule",
+        periodoDetected: periodoNumero,
+        sheetsProcessed: workbook.SheetNames.length,
+        sessionsFound: sessions.length,
+        results,
+      });
+    } else {
+      // Structured import file (Carreras, Periodos, Niveles, etc.)
+      const parsed = parseExcelFile(buffer);
+
+      const results = {
+        type: "structured",
+        carreras: await importCarreras(parsed.carreras),
+        periodos: await importPeriodos(parsed.periodos),
+        niveles: await importNiveles(parsed.niveles),
+        centros: await importCentros(parsed.centros),
+        docentes: await importDocentes(parsed.docentes),
+        materias: await importMaterias(parsed.materias),
+      };
+
+      return c.json(results);
+    }
   } catch (error) {
-    return c.json({ error: `Failed to import Excel file: ${String(error)}` }, 500);
+    console.error("[Import Error]", error);
+    return c.json({ error: `Error al importar: ${String(error)}` }, 500);
   }
 });
 
