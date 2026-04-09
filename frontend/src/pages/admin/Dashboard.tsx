@@ -129,10 +129,25 @@ const getNivelShort = (numero: number): string => {
   return map[numero] || `${numero}° nivel`;
 };
 
+// For Lengua Indígena subjects, show group number instead of centro name
+const LENGUA_GRUPO_MAP: Record<string, string> = {
+  'Latacunga': 'Grupo 1',
+  'Cayambe': 'Grupo 2',
+  'Otavalo': 'Grupo 3',
+  'Riobamba': 'Grupo 4',
+  'Amazonía Norte': 'Grupo 5',
+};
+
+const isLenguaIndigena = (nombre: string): boolean =>
+  /lengua\s+ind[ií]gena/i.test(nombre);
+
 const buildWhatsAppMsg = (asig: AsignacionFull): string => {
   const lines: string[] = [];
-  // Line 1: "2do nivel - Cayambe"
-  lines.push(`"${getNivelShort(asig.materia.nivel.numero)} - ${asig.centro.nombre}"`);
+  // Line 1: "2do nivel - Cayambe" (or "2do nivel - Grupo 2" for Lengua Indígena)
+  const centroLabel = isLenguaIndigena(asig.materia.nombre)
+    ? (LENGUA_GRUPO_MAP[asig.centro.nombre] || asig.centro.nombre)
+    : asig.centro.nombre;
+  lines.push(`"${getNivelShort(asig.materia.nivel.numero)} - ${centroLabel}"`);
   // Line 2: *Asignatura* con Docente
   lines.push(`*${asig.materia.nombre}* con ${asig.docente.nombre}`);
   // Line 3: Día | Hora enlace [Contraseña: "xxx"]

@@ -1641,15 +1641,28 @@ admin_routes.get("/whatsapp-export", async (c) => {
       return "S/B";
     };
 
+    // For Lengua Indígena subjects, show group number instead of centro name
+    const lenguaGrupoMap: Record<string, string> = {
+      "Latacunga": "Grupo 1",
+      "Cayambe": "Grupo 2",
+      "Otavalo": "Grupo 3",
+      "Riobamba": "Grupo 4",
+      "Amazonía Norte": "Grupo 5",
+    };
+    const isLenguaIndigena = (nombre: string) => /lengua\s+ind[ií]gena/i.test(nombre);
+
     // Format each asignacion for WhatsApp
     const formattedEntries = asignaciones.map((asig) => {
       const bimestreLabel = getBimestreLabel(
         asig.materia.bimestreOC,
         asig.materia.bimestreRL
       );
+      const centroLabel = isLenguaIndigena(asig.materia.nombre)
+        ? (lenguaGrupoMap[asig.centro.nombre] || asig.centro.nombre)
+        : asig.centro.nombre;
 
       return `*${asig.materia.nombreCorto}*
-Nivel: ${asig.materia.nivel.numero}° | Centro: ${asig.centro.nombre}
+Nivel: ${asig.materia.nivel.numero}° | Centro: ${centroLabel}
 Docente: ${asig.docente.nombre}
 Día: ${(asig as any).diaOverride || asig.materia.dia} | Hora: ${(asig as any).horaOverride || asig.materia.hora}
 Bloque: ${bimestreLabel}`;
