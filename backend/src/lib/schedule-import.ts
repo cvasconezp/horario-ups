@@ -261,6 +261,16 @@ export async function importScheduleSessions(sessions: ParsedSession[], periodoN
     return [{ success: false, data: null, error: `Periodo ${periodoNumero} not found or not active` }];
   }
 
+  // Fix session dates: use the periodo's year for all dates.
+  // Excel files often have wrong years (e.g., 2021 instead of 2026)
+  // because the person creating them doesn't update the year.
+  const periodoYear = periodo.fechaInicio.getFullYear();
+  for (const session of sessions) {
+    if (session.fecha.getFullYear() !== periodoYear) {
+      session.fecha.setFullYear(periodoYear);
+    }
+  }
+
   // Cache lookups
   const centroCache = new Map<string, number>();
   const nivelCache = new Map<number, number>();
