@@ -200,7 +200,8 @@ const formatSessionDate = (dateStr: string): string => {
   const d = new Date(dateStr);
   const day = d.getUTCDate();
   const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return `${day} ${months[d.getUTCMonth()]}`;
+  const year = d.getUTCFullYear();
+  return `${day} ${months[d.getUTCMonth()]} ${year}`;
 };
 
 export const AdminDashboard: React.FC = () => {
@@ -360,7 +361,7 @@ export const AdminDashboard: React.FC = () => {
     });
   }, [presenciales, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
 
-  // Sort presenciales — v5 build indicator
+  // Sort presenciales
   const sortedPresenciales = useMemo(() => {
     const col = presSortCol || 'fecha';
     const dir = presSortCol ? presSortDir : 'asc';
@@ -395,11 +396,6 @@ export const AdminDashboard: React.FC = () => {
       }
       return 0;
     });
-
-    // Debug: log first 5 items fecha to verify sort is running
-    if (result.length > 0) {
-      console.log('[SORT-v5]', col, dir, 'first 5 fechas:', result.slice(0, 5).map(s => s.fecha));
-    }
 
     return result;
   }, [filteredPresenciales, presSortCol, presSortDir]);
@@ -852,7 +848,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="mt-6">
               <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span className="inline-block w-3 h-3 bg-emerald-500 rounded-full"></span>
-                Sesiones Presenciales ({filteredPresenciales.length}) <span className="text-xs text-gray-400 font-normal">v5</span>
+                Sesiones Presenciales ({filteredPresenciales.length})
               </h3>
               <div className="overflow-x-auto rounded-lg border border-emerald-200">
                 <table className="w-full text-sm">
