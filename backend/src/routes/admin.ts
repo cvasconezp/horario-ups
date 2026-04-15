@@ -816,6 +816,28 @@ admin_routes.get("/asignaciones-all", async (c) => {
   }
 });
 
+// Sesiones presenciales for admin Dashboard
+admin_routes.get("/sesiones-presenciales-all", async (c) => {
+  try {
+    const sesiones = await prisma.sesionPresencial.findMany({
+      include: {
+        materia: {
+          include: { nivel: true },
+        },
+        docente: true,
+        centro: true,
+      },
+      orderBy: [
+        { fecha: "asc" },
+        { horaInicio: "asc" },
+      ],
+    });
+    return c.json(sesiones);
+  } catch (error) {
+    return c.json({ error: "Failed to fetch sesiones presenciales" }, 500);
+  }
+});
+
 admin_routes.get("/asignaciones", async (c) => {
   try {
     const { skip, limit } = getPaginationParams(c);

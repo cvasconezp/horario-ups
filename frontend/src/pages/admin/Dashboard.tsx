@@ -95,6 +95,40 @@ interface AsignacionFull {
   };
 }
 
+interface SesionPresencialFull {
+  id: number;
+  materiaId: number;
+  centroId: number;
+  docenteId: number | null;
+  fecha: string;
+  diaSemana: string;
+  horaInicio: string;
+  horaFin: string;
+  tipo: string;
+  bimestre: number;
+  materia: {
+    id: number;
+    nombre: string;
+    nombreCorto?: string;
+    nivelId: number;
+    nivel: {
+      id: number;
+      numero: number;
+      nombre: string;
+    };
+  };
+  docente: {
+    id: number;
+    nombre: string;
+    email: string | null;
+  } | null;
+  centro: {
+    id: number;
+    nombre: string;
+    zona: string;
+  };
+}
+
 interface UpcomingSesion {
   id: number;
   materiaId: number;
@@ -171,6 +205,7 @@ const formatSessionDate = (dateStr: string): string => {
 
 export const AdminDashboard: React.FC = () => {
   const [asignaciones, setAsignaciones] = useState<AsignacionFull[]>([]);
+  const [presenciales, setPresenciales] = useState<SesionPresencialFull[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,10 +259,14 @@ export const AdminDashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await client.get<AsignacionFull[]>('/admin/asignaciones-all');
-        setAsignaciones(response.data);
+        const [asigRes, presRes] = await Promise.all([
+          client.get<AsignacionFull[]>('/admin/asignaciones-all'),
+          client.get<SesionPresencialFull[]>('/admin/sesiones-presenciales-all'),
+        ]);
+        setAsignaciones(asigRes.data);
+        setPresenciales(presRes.data);
       } catch (err) {
-        setError('Error cargando asignaciones');
+        setError('Error cargando datos');
         console.error(err);
       } finally {
         setIsLoading(false);
@@ -240,14 +279,16 @@ export const AdminDashboard: React.FC = () => {
   const niveles = useMemo(() => {
     const set = new Map<number, string>();
     asignaciones.forEach((a) => set.set(a.materia.nivel.numero, `${a.materia.nivel.numero}°`));
+    presenciales.forEach((s) => set.set(s.materia.nivel.numero, `${s.materia.nivel.numero}°`));
     return Array.from(set.entries()).sort((a, b) => a[0] - b[0]);
-  }, [asignaciones]);
+  }, [asignaciones, presenciales]);
 
   const centros = useMemo(() => {
     const set = new Map<number, string>();
     asignaciones.forEach((a) => set.set(a.centro.id, a.centro.nombre));
+    presenciales.forEach((s) => set.set(s.centro.id, s.centro.nombre));
     return Array.from(set.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [asignaciones]);
+  }, [asignaciones, presenciales]);
 
   const dias = useMemo(() => {
     return ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -293,6 +334,29 @@ export const AdminDashboard: React.FC = () => {
       return 0;
     });
   }, [filtered, sortCol, sortDir]);
+
+  // Filter presencial sessions with same filters
+  const filteredPresenciales = useMemo(() => {
+    return presenciales.filter((s) => {
+      if (searchText) {
+        const q = searchText.toLowerCase();
+        const matches =
+          s.materia.nombre.toLowerCase().includes(q) ||
+          (s.docente?.nombre || '').toLowerCase().includes(q) ||
+          s.centro.nombre.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (filterNivel && s.materia.nivel.numero !== parseInt(filterNivel)) return false;
+      if (filterCentro && s.centro.id !== parseInt(filterCentro)) return false;
+      if (filterDia && s.diaSemana !== filterDia) return false;
+      // Bloque filter: map bimestre to bloque label
+      if (filterBloques.length > 0) {
+        const bloqueLabel = s.bimestre === 1 ? '1ER BLOQUE' : s.bimestre === 2 ? '2DO BLOQUE' : 'SEMESTRAL';
+        if (!filterBloques.includes(bloqueLabel)) return false;
+      }
+      return true;
+    });
+  }, [presenciales, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
 
   const handleSort = (col: string) => {
     if (sortCol === col) {
@@ -558,7 +622,7 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-sm opacity-80">EIB en Línea</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2 text-sm font-semibold">
-            {sorted.length}/{asignaciones.length}
+            {sorted.length + filteredPresenciales.length} resultados
           </div>
         </div>
 
@@ -722,9 +786,58 @@ export const AdminDashboard: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {sorted.length === 0 && !isLoading && (
+              {sorted.length === 0 && filteredPresenciales.length === 0 && !isLoading && (
                 <div className="p-8 text-center text-gray-500">No se encontraron asignaciones con los filtros actuales</div>
               )}
+            </div>
+          )}
+
+          {/* Presencial Sessions Table */}
+          {filteredPresenciales.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-emerald-500 rounded-full"></span>
+                Sesiones Presenciales ({filteredPresenciales.length})
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-emerald-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-emerald-50 border-b border-emerald-200">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Nivel</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Centro</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Tipo</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Asignatura</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Docente</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Día</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Fecha</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Horario</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPresenciales.map((s, idx) => {
+                      const tipoLabel = s.tipo === 'examen' ? 'Examen' : 'Tutoría';
+                      const tipoColor = s.tipo === 'examen' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
+                      return (
+                        <tr key={`pres-${s.id}`}
+                          className={`border-b border-gray-100 hover:bg-emerald-50/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                          <td className="px-4 py-3 font-medium text-gray-900">{s.materia.nivel.numero}°</td>
+                          <td className="px-4 py-3 text-gray-700">{s.centro.nombre}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded ${tipoColor}`}>
+                              {tipoLabel} B{s.bimestre}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900">{s.materia.nombre}</td>
+                          <td className="px-4 py-3 text-gray-700">{s.docente?.nombre || '—'}</td>
+                          <td className="px-4 py-3 text-gray-700">{s.diaSemana}</td>
+                          <td className="px-4 py-3 text-gray-700">{formatSessionDate(s.fecha)}</td>
+                          <td className="px-4 py-3 text-gray-700">{s.horaInicio} - {s.horaFin}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
