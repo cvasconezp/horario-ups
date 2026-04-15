@@ -1371,7 +1371,7 @@ admin_routes.post("/import-excel", async (c) => {
         return c.json({ error: "No se pudo detectar el número de periodo en el archivo" }, 400);
       }
 
-      const sessions = parseScheduleFile(buffer, periodoNumero);
+      const sessions = parseScheduleFile(buffer);
       const results = await importScheduleSessions(sessions, periodoNumero);
 
       return c.json({

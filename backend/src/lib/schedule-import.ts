@@ -94,7 +94,7 @@ function parseSheetName(name: string): { centroName: string; nivelNumero: number
 /**
  * Parse all sheets in the workbook and extract presencial sessions.
  */
-export function parseScheduleFile(buffer: Buffer, targetPeriodo?: number): ParsedSession[] {
+export function parseScheduleFile(buffer: Buffer): ParsedSession[] {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sessions: ParsedSession[] = [];
 
@@ -105,16 +105,10 @@ export function parseScheduleFile(buffer: Buffer, targetPeriodo?: number): Parse
     const sheet = workbook.Sheets[sheetName];
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 
-    // If a target periodo is specified, skip sheets that don't match
-    if (targetPeriodo) {
-      let sheetPeriodo = 0;
-      for (const row of rows.slice(0, 6)) {
-        const cell = String(row?.[0] || "");
-        const match = cell.match(/Periodo\s+(\d+)/i);
-        if (match) { sheetPeriodo = parseInt(match[1]); break; }
-      }
-      if (sheetPeriodo && sheetPeriodo !== targetPeriodo) continue;
-    }
+    // NOTE: We no longer skip sheets based on periodo number in the header.
+    // The periodo in individual sheets can be a copy-paste error (e.g. "Periodo 66"
+    // in a file that is clearly for Periodo 68). The correct periodo is determined
+    // by frequency detection across all sheets in the admin import route.
 
     let currentBimestre = 1;
     let isExamen = false;
@@ -154,8 +148,9 @@ export function parseScheduleFile(buffer: Buffer, targetPeriodo?: number): Parse
         continue;
       }
 
-      // Detect date lines - could be "Fechas: sábado 11 de abril de 2026"
-      if (cell0Lower.startsWith("fecha")) {
+      // Detect date lines - "Fechas: sábado 11 de abril de 2026"
+      // Skip "Fecha de inicio:" lines which are not session dates
+      if (cell0Lower.startsWith("fecha") && !cell0Lower.includes("inicio")) {
         const parsed = parseSpanishDate(cell0);
         if (parsed) {
           currentDate = parsed;
