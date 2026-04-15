@@ -115,35 +115,30 @@ export const ImportPage: React.FC = () => {
 
         {/* Sample Data */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="font-bold text-yellow-900 mb-2">Formato de Ejemplo</h3>
+          <h3 className="font-bold text-yellow-900 mb-2">Archivos de Horario (Zona Norte / Zona Sur)</h3>
           <p className="text-sm text-yellow-800 mb-3">
-            Tu archivo Excel debe tener columnas similares a estas:
+            Archivos Excel con hojas nombradas por centro y nivel. El sistema detecta autom&aacute;ticamente el formato y extrae las sesiones presenciales.
           </p>
           <div className="bg-white rounded p-3 text-xs overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b">
                   <th className="border px-2 py-1 text-left font-semibold">
-                    Nombre
+                    Hoja
                   </th>
                   <th className="border px-2 py-1 text-left font-semibold">
-                    Email
-                  </th>
-                  <th className="border px-2 py-1 text-left font-semibold">
-                    Carrera
+                    Contenido
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="border px-2 py-1">Juan García</td>
-                  <td className="border px-2 py-1">juan@ups.edu.ec</td>
-                  <td className="border px-2 py-1">Ingeniería en Sistemas</td>
+                  <td className="border px-2 py-1 font-medium">Riobamba - II Nivel Ajuste</td>
+                  <td className="border px-2 py-1">Tutor&iacute;as presenciales y ex&aacute;menes con fechas, horas, materias y docentes</td>
                 </tr>
                 <tr>
-                  <td className="border px-2 py-1">María López</td>
-                  <td className="border px-2 py-1">maria@ups.edu.ec</td>
-                  <td className="border px-2 py-1">Ingeniería en Electrónica</td>
+                  <td className="border px-2 py-1 font-medium">Cayambe - IV Nivel - Ajuste</td>
+                  <td className="border px-2 py-1">Incluye s&aacute;bados y domingos en columnas paralelas</td>
                 </tr>
               </tbody>
             </table>

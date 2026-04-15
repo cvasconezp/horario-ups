@@ -94,7 +94,7 @@ function parseSheetName(name: string): { centroName: string; nivelNumero: number
 /**
  * Parse all sheets in the workbook and extract presencial sessions.
  */
-export function parseScheduleFile(buffer: Buffer): ParsedSession[] {
+export function parseScheduleFile(buffer: Buffer, targetPeriodo?: number): ParsedSession[] {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sessions: ParsedSession[] = [];
 
@@ -104,6 +104,17 @@ export function parseScheduleFile(buffer: Buffer): ParsedSession[] {
 
     const sheet = workbook.Sheets[sheetName];
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+    // If a target periodo is specified, skip sheets that don't match
+    if (targetPeriodo) {
+      let sheetPeriodo = 0;
+      for (const row of rows.slice(0, 6)) {
+        const cell = String(row?.[0] || "");
+        const match = cell.match(/Periodo\s+(\d+)/i);
+        if (match) { sheetPeriodo = parseInt(match[1]); break; }
+      }
+      if (sheetPeriodo && sheetPeriodo !== targetPeriodo) continue;
+    }
 
     let currentBimestre = 1;
     let isExamen = false;

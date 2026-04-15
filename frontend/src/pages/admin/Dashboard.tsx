@@ -250,11 +250,8 @@ export const AdminDashboard: React.FC = () => {
   }, [asignaciones]);
 
   const dias = useMemo(() => {
-    const order = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    const set = new Set<string>();
-    asignaciones.forEach((a) => { const d = getEffectiveDia(a); if (d) set.add(d); });
-    return order.filter((d) => set.has(d));
-  }, [asignaciones]);
+    return ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  }, []);
 
   // Apply filters
   const filtered = useMemo(() => {

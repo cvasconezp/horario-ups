@@ -1310,8 +1310,8 @@ admin_routes.post("/import-excel", async (c) => {
 
     if (isScheduleFile(workbook.SheetNames)) {
       // Schedule file (e.g., "Riobamba - II Nivel Ajuste")
-      // Extract periodo number from sheet content
-      let periodoNumero = 0;
+      // Extract periodo number from sheet content (use most frequent across sheets)
+      const periodoCounts: Record<number, number> = {};
       for (const sheetName of workbook.SheetNames) {
         const sheet = workbook.Sheets[sheetName];
         const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
@@ -1319,18 +1319,27 @@ admin_routes.post("/import-excel", async (c) => {
           const cell = String(row?.[0] || "");
           const match = cell.match(/Periodo\s+(\d+)/i);
           if (match) {
-            periodoNumero = parseInt(match[1]);
+            const num = parseInt(match[1]);
+            periodoCounts[num] = (periodoCounts[num] || 0) + 1;
             break;
           }
         }
-        if (periodoNumero) break;
+      }
+      // Pick the most frequent periodo number
+      let periodoNumero = 0;
+      let maxCount = 0;
+      for (const [num, count] of Object.entries(periodoCounts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          periodoNumero = parseInt(num);
+        }
       }
 
       if (!periodoNumero) {
         return c.json({ error: "No se pudo detectar el número de periodo en el archivo" }, 400);
       }
 
-      const sessions = parseScheduleFile(buffer);
+      const sessions = parseScheduleFile(buffer, periodoNumero);
       const results = await importScheduleSessions(sessions, periodoNumero);
 
       return c.json({
