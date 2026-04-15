@@ -360,36 +360,34 @@ export const AdminDashboard: React.FC = () => {
     });
   }, [presenciales, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
 
-  // Sort presenciales - helper to get sort value
-  const getPresSortVal = (s: SesionPresencialFull, col: string): string | number => {
-    switch (col) {
-      case 'nivel': return s.materia.nivel.numero;
-      case 'centro': return s.centro.nombre;
-      case 'tipo': return `${s.tipo}-${s.bimestre}`;
-      case 'asignatura': return s.materia.nombre;
-      case 'docente': return s.docente?.nombre || '';
-      case 'dia': return DIAS.indexOf(s.diaSemana);
-      case 'fecha': return new Date(s.fecha).getTime();
-      case 'horario': return s.horaInicio;
-      default: return '';
-    }
-  };
-
+  // Sort presenciales
   const sortedPresenciales = useMemo(() => {
     const col = presSortCol || 'fecha';
     const dir = presSortCol ? presSortDir : 'asc';
-    const arr = [...filteredPresenciales];
-    arr.sort((a, b) => {
-      const aVal = getPresSortVal(a, col);
-      const bVal = getPresSortVal(b, col);
-      if (aVal < bVal) return dir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+
+    const getSortVal = (s: SesionPresencialFull, c: string): string | number => {
+      switch (c) {
+        case 'nivel': return s.materia.nivel.numero;
+        case 'centro': return s.centro.nombre;
+        case 'tipo': return `${s.tipo}-${s.bimestre}`;
+        case 'asignatura': return s.materia.nombre;
+        case 'docente': return s.docente?.nombre || '';
+        case 'dia': return DIAS.indexOf(s.diaSemana);
+        case 'fecha': return String(s.fecha);
+        case 'horario': return s.horaInicio;
+        default: return '';
+      }
+    };
+
+    return [...filteredPresenciales].sort((a, b) => {
+      const aVal = getSortVal(a, col);
+      const bVal = getSortVal(b, col);
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      if (cmp !== 0) return dir === 'asc' ? cmp : -cmp;
       // Tiebreaker: fecha then horaInicio
       if (col !== 'fecha') {
-        const af = new Date(a.fecha).getTime();
-        const bf = new Date(b.fecha).getTime();
-        if (af < bf) return -1;
-        if (af > bf) return 1;
+        const fc = String(a.fecha) < String(b.fecha) ? -1 : String(a.fecha) > String(b.fecha) ? 1 : 0;
+        if (fc !== 0) return fc;
       }
       if (col !== 'horario') {
         if (a.horaInicio < b.horaInicio) return -1;
@@ -397,7 +395,6 @@ export const AdminDashboard: React.FC = () => {
       }
       return 0;
     });
-    return arr;
   }, [filteredPresenciales, presSortCol, presSortDir]);
 
   const handlePresSort = (col: string) => {
