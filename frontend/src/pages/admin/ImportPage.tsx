@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ExcelImport } from '../../components/admin/ExcelImport';
 import client from '../../api/client';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
 
 export const ImportPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [status, setStatus] = useState<{
     type: 'success' | 'error' | null;
     message: string;
@@ -55,6 +56,25 @@ export const ImportPage: React.FC = () => {
     }
   };
 
+  const handleClearPresenciales = async () => {
+    if (!window.confirm('¿Estás seguro de eliminar todas las sesiones presenciales? Podrás re-importarlas después.')) return;
+    try {
+      setIsClearing(true);
+      const response = await client.delete('/admin/sesiones-presenciales');
+      setStatus({
+        type: 'success',
+        message: `Se eliminaron ${response.data.deleted} sesiones presenciales. Puedes re-importar los archivos de horario.`,
+      });
+    } catch (error: any) {
+      setStatus({
+        type: 'error',
+        message: error?.response?.data?.error || 'Error al eliminar sesiones presenciales.',
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <AdminLayout pageTitle="Importar Datos">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -79,6 +99,22 @@ export const ImportPage: React.FC = () => {
         {/* Upload Component */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <ExcelImport onFileSelected={handleFileSelected} isLoading={isLoading} />
+        </div>
+
+        {/* Clear presenciales for re-import */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Re-importar horarios presenciales</p>
+            <p className="text-xs text-gray-500">Elimina todas las sesiones presenciales para volver a importarlas</p>
+          </div>
+          <button
+            onClick={handleClearPresenciales}
+            disabled={isClearing}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+            {isClearing ? 'Eliminando...' : 'Limpiar presenciales'}
+          </button>
         </div>
 
         {/* Status Message */}

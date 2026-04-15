@@ -225,6 +225,8 @@ export const AdminDashboard: React.FC = () => {
   const [filterDia, setFilterDia] = useState('');
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [presSortCol, setPresSortCol] = useState<string | null>(null);
+  const [presSortDir, setPresSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Copy state
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -357,6 +359,37 @@ export const AdminDashboard: React.FC = () => {
       return true;
     });
   }, [presenciales, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
+
+  // Sort presenciales
+  const sortedPresenciales = useMemo(() => {
+    if (!presSortCol) return filteredPresenciales;
+    return [...filteredPresenciales].sort((a, b) => {
+      let aVal: string | number = '';
+      let bVal: string | number = '';
+      switch (presSortCol) {
+        case 'nivel': aVal = a.materia.nivel.numero; bVal = b.materia.nivel.numero; break;
+        case 'centro': aVal = a.centro.nombre; bVal = b.centro.nombre; break;
+        case 'tipo': aVal = `${a.tipo}-${a.bimestre}`; bVal = `${b.tipo}-${b.bimestre}`; break;
+        case 'asignatura': aVal = a.materia.nombre; bVal = b.materia.nombre; break;
+        case 'docente': aVal = a.docente?.nombre || ''; bVal = b.docente?.nombre || ''; break;
+        case 'dia': aVal = DIAS.indexOf(a.diaSemana); bVal = DIAS.indexOf(b.diaSemana); break;
+        case 'fecha': aVal = a.fecha; bVal = b.fecha; break;
+        case 'horario': aVal = a.horaInicio; bVal = b.horaInicio; break;
+      }
+      if (aVal < bVal) return presSortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return presSortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredPresenciales, presSortCol, presSortDir]);
+
+  const handlePresSort = (col: string) => {
+    if (presSortCol === col) {
+      setPresSortDir(presSortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setPresSortCol(col);
+      setPresSortDir('asc');
+    }
+  };
 
   const handleSort = (col: string) => {
     if (sortCol === col) {
@@ -622,7 +655,7 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-sm opacity-80">EIB en Línea</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-lg px-4 py-2 text-sm font-semibold">
-            {sorted.length + filteredPresenciales.length} resultados
+            {sorted.length + sortedPresenciales.length} resultados
           </div>
         </div>
 
@@ -786,7 +819,7 @@ export const AdminDashboard: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {sorted.length === 0 && filteredPresenciales.length === 0 && !isLoading && (
+              {sorted.length === 0 && sortedPresenciales.length === 0 && !isLoading && (
                 <div className="p-8 text-center text-gray-500">No se encontraron asignaciones con los filtros actuales</div>
               )}
             </div>
@@ -803,18 +836,32 @@ export const AdminDashboard: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-emerald-50 border-b border-emerald-200">
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Nivel</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Centro</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Tipo</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Asignatura</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Docente</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Día</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Fecha</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600">Horario</th>
+                      {[
+                        { id: 'nivel', label: 'Nivel' },
+                        { id: 'centro', label: 'Centro' },
+                        { id: 'tipo', label: 'Tipo' },
+                        { id: 'asignatura', label: 'Asignatura' },
+                        { id: 'docente', label: 'Docente' },
+                        { id: 'dia', label: 'Día' },
+                        { id: 'fecha', label: 'Fecha' },
+                        { id: 'horario', label: 'Horario' },
+                      ].map((col) => (
+                        <th key={col.id} className="px-4 py-3 text-left font-semibold text-gray-600">
+                          <button onClick={() => handlePresSort(col.id)}
+                            className="flex items-center gap-1 hover:text-emerald-700 transition group">
+                            {col.label}
+                            {presSortCol === col.id ? (
+                              presSortDir === 'asc' ? <ChevronUp size={14} className="text-emerald-600" /> : <ChevronDown size={14} className="text-emerald-600" />
+                            ) : (
+                              <ChevronsUpDown size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </button>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPresenciales.map((s, idx) => {
+                    {sortedPresenciales.map((s, idx) => {
                       const tipoLabel = s.tipo === 'examen' ? 'Examen' : 'Tutoría';
                       const tipoColor = s.tipo === 'examen' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
                       return (

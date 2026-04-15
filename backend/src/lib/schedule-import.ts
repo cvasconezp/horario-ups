@@ -318,7 +318,7 @@ export async function importScheduleSessions(sessions: ParsedSession[], periodoN
       const sessionMatLower = session.materiaNombre.toLowerCase().trim();
       // Exact match first
       materiaId = materiaCache.get(sessionMatLower);
-      // If not found, try partial match
+      // If not found, try partial match (one must contain the other)
       if (!materiaId) {
         for (const [matName, matId] of materiaCache) {
           if (matName.includes(sessionMatLower) || sessionMatLower.includes(matName)) {
@@ -327,15 +327,40 @@ export async function importScheduleSessions(sessions: ParsedSession[], periodoN
           }
         }
       }
-      // Still not found? Try matching by significant words
+      // Still not found? Try matching by significant words with high threshold
       if (!materiaId) {
-        const words = sessionMatLower.split(/\s+/).filter((w) => w.length > 4);
+        // Extract the "title part" before any colon (e.g. "Práctica Preprofesional" from "Práctica Preprofesional: ...")
+        const titlePart = sessionMatLower.split(":")[0].trim();
+        const stopWords = new Set(["para", "los", "las", "del", "con", "una", "desde", "hacia", "entre"]);
+        const words = sessionMatLower.split(/\s+/).filter((w) => w.length > 4 && !stopWords.has(w));
+        const titleWords = titlePart.split(/\s+/).filter((w) => w.length > 4 && !stopWords.has(w));
+
+        let bestMatch: { id: number; score: number } | null = null;
         for (const [matName, matId] of materiaCache) {
-          const matchCount = words.filter((w) => matName.includes(w)).length;
-          if (matchCount >= 2) {
-            materiaId = matId;
-            break;
+          const matTitlePart = matName.split(":")[0].trim();
+          const matTitleWords = matTitlePart.split(/\s+/).filter((w) => w.length > 4 && !stopWords.has(w));
+
+          // Title words must match well (the main subject name before the colon)
+          const titleMatchCount = titleWords.filter((w) => matTitlePart.includes(w)).length;
+          const matTitleMatchCount = matTitleWords.filter((w) => titlePart.includes(w)).length;
+          const titleScore = titleWords.length > 0 ? titleMatchCount / titleWords.length : 0;
+          const matTitleScore = matTitleWords.length > 0 ? matTitleMatchCount / matTitleWords.length : 0;
+          const avgTitleScore = (titleScore + matTitleScore) / 2;
+
+          // Also check full word overlap
+          const fullMatchCount = words.filter((w) => matName.includes(w)).length;
+          const fullScore = words.length > 0 ? fullMatchCount / words.length : 0;
+
+          // Require strong title match (>= 70%) AND reasonable full match (>= 50%)
+          if (avgTitleScore >= 0.7 && fullScore >= 0.5) {
+            const combinedScore = avgTitleScore * 2 + fullScore;
+            if (!bestMatch || combinedScore > bestMatch.score) {
+              bestMatch = { id: matId, score: combinedScore };
+            }
           }
+        }
+        if (bestMatch) {
+          materiaId = bestMatch.id;
         }
       }
 
@@ -351,7 +376,7 @@ export async function importScheduleSessions(sessions: ParsedSession[], periodoN
         const docLower = session.docenteNombre.toLowerCase().trim();
         docenteId = docenteCache.get(docLower) || null;
         if (!docenteId) {
-          // Try partial match
+          // Try partial match (one name fully contains the other)
           for (const [docName, docId] of docenteCache) {
             if (docName.includes(docLower) || docLower.includes(docName)) {
               docenteId = docId;
@@ -359,16 +384,34 @@ export async function importScheduleSessions(sessions: ParsedSession[], periodoN
             }
           }
         }
-        // If still not found, try matching by last name
+        // Try matching by multiple name parts (require at least 2 parts to match)
+        if (!docenteId) {
+          const parts = docLower.split(/\s+/).filter((p) => p.length > 2);
+          if (parts.length >= 2) {
+            let bestDoc: { id: number; matches: number } | null = null;
+            for (const [docName, docId] of docenteCache) {
+              const matchCount = parts.filter((p) => docName.includes(p)).length;
+              if (matchCount >= 2 && (!bestDoc || matchCount > bestDoc.matches)) {
+                bestDoc = { id: docId, matches: matchCount };
+              }
+            }
+            if (bestDoc) docenteId = bestDoc.id;
+          }
+        }
+        // Last resort: match by last name only if there's exactly one match
         if (!docenteId) {
           const parts = docLower.split(/\s+/);
           const lastName = parts[parts.length - 1];
           if (lastName && lastName.length > 3) {
+            const matches: number[] = [];
             for (const [docName, docId] of docenteCache) {
               if (docName.includes(lastName)) {
-                docenteId = docId;
-                break;
+                matches.push(docId);
               }
+            }
+            // Only use if exactly one docente matches to avoid ambiguity
+            if (matches.length === 1) {
+              docenteId = matches[0];
             }
           }
         }

@@ -816,6 +816,16 @@ admin_routes.get("/asignaciones-all", async (c) => {
   }
 });
 
+// Delete all sesiones presenciales (for re-import)
+admin_routes.delete("/sesiones-presenciales", async (c) => {
+  try {
+    const result = await prisma.sesionPresencial.deleteMany({});
+    return c.json({ deleted: result.count });
+  } catch (error) {
+    return c.json({ error: "Failed to delete sesiones presenciales" }, 500);
+  }
+});
+
 // Sesiones presenciales for admin Dashboard
 admin_routes.get("/sesiones-presenciales-all", async (c) => {
   try {
