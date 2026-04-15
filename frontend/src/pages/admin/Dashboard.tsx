@@ -360,35 +360,44 @@ export const AdminDashboard: React.FC = () => {
     });
   }, [presenciales, searchText, filterNivel, filterCentro, filterBloques, filterDia]);
 
-  // Sort presenciales
+  // Sort presenciales - helper to get sort value
+  const getPresSortVal = (s: SesionPresencialFull, col: string): string | number => {
+    switch (col) {
+      case 'nivel': return s.materia.nivel.numero;
+      case 'centro': return s.centro.nombre;
+      case 'tipo': return `${s.tipo}-${s.bimestre}`;
+      case 'asignatura': return s.materia.nombre;
+      case 'docente': return s.docente?.nombre || '';
+      case 'dia': return DIAS.indexOf(s.diaSemana);
+      case 'fecha': return new Date(s.fecha).getTime();
+      case 'horario': return s.horaInicio;
+      default: return '';
+    }
+  };
+
   const sortedPresenciales = useMemo(() => {
-    if (!presSortCol) return filteredPresenciales;
-    return [...filteredPresenciales].sort((a, b) => {
-      let aVal: string | number = '';
-      let bVal: string | number = '';
-      switch (presSortCol) {
-        case 'nivel': aVal = a.materia.nivel.numero; bVal = b.materia.nivel.numero; break;
-        case 'centro': aVal = a.centro.nombre; bVal = b.centro.nombre; break;
-        case 'tipo': aVal = `${a.tipo}-${a.bimestre}`; bVal = `${b.tipo}-${b.bimestre}`; break;
-        case 'asignatura': aVal = a.materia.nombre; bVal = b.materia.nombre; break;
-        case 'docente': aVal = a.docente?.nombre || ''; bVal = b.docente?.nombre || ''; break;
-        case 'dia': aVal = DIAS.indexOf(a.diaSemana); bVal = DIAS.indexOf(b.diaSemana); break;
-        case 'fecha': aVal = new Date(a.fecha).getTime(); bVal = new Date(b.fecha).getTime(); break;
-        case 'horario': aVal = a.horaInicio; bVal = b.horaInicio; break;
+    const col = presSortCol || 'fecha';
+    const dir = presSortCol ? presSortDir : 'asc';
+    const arr = [...filteredPresenciales];
+    arr.sort((a, b) => {
+      const aVal = getPresSortVal(a, col);
+      const bVal = getPresSortVal(b, col);
+      if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+      // Tiebreaker: fecha then horaInicio
+      if (col !== 'fecha') {
+        const af = new Date(a.fecha).getTime();
+        const bf = new Date(b.fecha).getTime();
+        if (af < bf) return -1;
+        if (af > bf) return 1;
       }
-      if (aVal < bVal) return presSortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return presSortDir === 'asc' ? 1 : -1;
-      // Secondary sort: by fecha then horaInicio when primary values are equal
-      if (presSortCol !== 'fecha') {
-        const aDate = new Date(a.fecha).getTime();
-        const bDate = new Date(b.fecha).getTime();
-        if (aDate !== bDate) return aDate - bDate;
-      }
-      if (presSortCol !== 'horario') {
-        return a.horaInicio.localeCompare(b.horaInicio);
+      if (col !== 'horario') {
+        if (a.horaInicio < b.horaInicio) return -1;
+        if (a.horaInicio > b.horaInicio) return 1;
       }
       return 0;
     });
+    return arr;
   }, [filteredPresenciales, presSortCol, presSortDir]);
 
   const handlePresSort = (col: string) => {
