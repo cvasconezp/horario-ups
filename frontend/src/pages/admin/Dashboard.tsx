@@ -225,7 +225,7 @@ export const AdminDashboard: React.FC = () => {
   const [filterDia, setFilterDia] = useState('');
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [presSortCol, setPresSortCol] = useState<string | null>(null);
+  const [presSortCol, setPresSortCol] = useState<string | null>('fecha');
   const [presSortDir, setPresSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Copy state
@@ -373,11 +373,20 @@ export const AdminDashboard: React.FC = () => {
         case 'asignatura': aVal = a.materia.nombre; bVal = b.materia.nombre; break;
         case 'docente': aVal = a.docente?.nombre || ''; bVal = b.docente?.nombre || ''; break;
         case 'dia': aVal = DIAS.indexOf(a.diaSemana); bVal = DIAS.indexOf(b.diaSemana); break;
-        case 'fecha': aVal = a.fecha; bVal = b.fecha; break;
+        case 'fecha': aVal = new Date(a.fecha).getTime(); bVal = new Date(b.fecha).getTime(); break;
         case 'horario': aVal = a.horaInicio; bVal = b.horaInicio; break;
       }
       if (aVal < bVal) return presSortDir === 'asc' ? -1 : 1;
       if (aVal > bVal) return presSortDir === 'asc' ? 1 : -1;
+      // Secondary sort: by fecha then horaInicio when primary values are equal
+      if (presSortCol !== 'fecha') {
+        const aDate = new Date(a.fecha).getTime();
+        const bDate = new Date(b.fecha).getTime();
+        if (aDate !== bDate) return aDate - bDate;
+      }
+      if (presSortCol !== 'horario') {
+        return a.horaInicio.localeCompare(b.horaInicio);
+      }
       return 0;
     });
   }, [filteredPresenciales, presSortCol, presSortDir]);
